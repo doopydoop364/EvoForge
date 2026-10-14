@@ -266,6 +266,9 @@ class Supervisor:
             source.rename(target)
             try:
                 with self.database.connect() as db:
+                    # Deferral must belong to an explicit transaction. An implicit
+                    # BEGIN can reset it before updating a referenced experiment.
+                    db.execute("BEGIN IMMEDIATE")
                     db.execute("PRAGMA defer_foreign_keys=ON")
                     db.execute("UPDATE experiments SET id=? WHERE id=?", (destination, experiment))
                     for table in ("workers", "metrics", "events"):
