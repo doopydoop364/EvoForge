@@ -36,7 +36,10 @@ must be independently testable without FastAPI or Textual imports in the engine.
    startup, second-client controls, pause/resume/stop, duplicate races, SIGKILL
    recovery, stale/PID identity rejection and launching-client exit + SIGHUP.
    Actual SSH logout and systemd remain operator acceptance scenarios.
-4. Live telemetry: pending.
+4. Live telemetry: implemented bounded SQLite WAL ring, nonblocking drop policy,
+   actual evaluation frames, independent replay modes and Textual live consumer.
+   Telemetry + baseline Textual tests: 3 passed. Baseline shutdown race fixed by
+   guarding timer access after DOM removal; champion auto-reload removed.
 5. REST/WebSocket API: pending.
 6. Analytics, Textual, documentation and release checks: pending.
 

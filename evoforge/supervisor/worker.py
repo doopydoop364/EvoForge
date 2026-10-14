@@ -82,7 +82,9 @@ def run_worker(root, experiment, identity, lock_fd):
     try:
         from evoforge.trainer import Trainer, Config
         cfg = Config(**json.loads((path / 'config.json').read_text()))
-        trainer = Trainer(cfg, path, resume=(path / 'checkpoint.pt').exists(), control=control, managed=True)
+        from evoforge.telemetry import TrainingPublisher
+        trainer = Trainer(cfg, path, resume=(path / 'checkpoint.pt').exists(), control=control,
+                          telemetry=TrainingPublisher(path, cfg.game, identity), managed=True)
         trainer.on_commit = lambda current: database.sync_metrics(experiment, current.history)
         trainer.on_commit(trainer)
         with database.connect() as db:

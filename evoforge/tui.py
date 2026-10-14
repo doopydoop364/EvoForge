@@ -83,6 +83,10 @@ class EvoForgeApp(App):
         self.spectator_split = "balanced"
         self.spectator_show_all = True
         self._spectator_snapshot_mtime = None
+        self.spectator_mode = 'live'
+        self._frame_cursor = 0
+        self._live_frames = {}
+        self._closing = False
 
     def compose(self) -> ComposeResult:
         yield Header(show_clock=True)
@@ -112,7 +116,9 @@ class EvoForgeApp(App):
                     yield Button("Rename", id="rename-run")
                     yield Button("Archive", id="archive-run")
             with TabPane("Spectator", id="spectator"):
-                yield Static("SAVED CHAMPION / REPLAY", classes="heading")
+                yield Static("LIVE TRAINING / CHAMPION / POPULATION", classes="heading")
+                yield Select([('Live Training', 'live'), ('Champion Replay', 'champion'), ('Population Replay', 'population')],
+                             id='spectator-mode', value='live', allow_blank=False)
                 with Horizontal(classes="actions"):
                     yield Button("Load champion", id="load-champion", variant="primary")
                     yield Button("Restart episode", id="restart-replay")
@@ -179,6 +185,9 @@ class EvoForgeApp(App):
         self._load_settings()
         self._list_runs()
         self._load_champion()
+        self.spectator_mode = 'live'
+        self._frame_cursor = 0
+        self._live_frames = {}
         self._refresh()
         self.notify_status(f"Opened {self.directory}")
 
@@ -259,6 +268,7 @@ class EvoForgeApp(App):
         self.notify_status(f"Created {name}; edit its configuration and save")
 
     def _refresh(self):
+        if self._closing or not self.query("#run-info"):return
         if self.proc and self.proc.poll() is not None:
             rc = self.proc.returncode
             self.proc = None
@@ -269,14 +279,8 @@ class EvoForgeApp(App):
         try: cfg = json.loads((self.directory / "config.json").read_text())
         except (OSError,ValueError): pass
         rows = _history(self.directory/"metrics.csv")
-        snapshot = self.directory / "spectator.pt"
-        try:
-            mtime = snapshot.stat().st_mtime_ns
-            if mtime != self._spectator_snapshot_mtime:
-                self._load_champion(live=True)
-                self._spectator_snapshot_mtime = mtime
-        except OSError:
-            pass
+        if self.spectator_mode == 'live':
+            self._poll_frames()
         service_snapshot = RunService(self.directory).snapshot()
         latest = rows[-1] if rows else {}
         worker = service_snapshot["worker"]
@@ -317,6 +321,11 @@ class EvoForgeApp(App):
             self.last_log = content
 
     def _load_champion(self, live=False):
+        from .games import close_env
+        from .agents import policy_for
+        for agent in self.agents:
+            close_env(agent['env'])
+        self.spectator_mode = 'population' if live else 'champion'
         self.agents = []
         self._spectator_paused.clear()
         champion = self.directory / "champion.pt"
@@ -331,26 +340,26 @@ class EvoForgeApp(App):
                 model, config = load_champion(champion); models = [model]
             else:
                 models=[]; config={}
-            if snapshot.exists():
+            if snapshot.exists() and live:
                 data = safe_load(snapshot)
                 snap_cfg=data.get("config",{})
                 if not config: config=snap_cfg
                 if all(snap_cfg.get(k,config.get(k)) == config.get(k) for k in ("game","size","hidden")):
                     for weights in data.get("policies",[])[:9]:
-                        policy=Policy(hidden=config["hidden"]);policy.load_state_dict(weights);policy.eval();models.append(policy)
+                        policy=policy_for(config.get("game","snake"), config["hidden"], config.get("game_config"), config["size"], config["max_steps"]);policy.load_state_dict(weights);policy.eval();models.append(policy)
             if not models: raise ValueError("no compatible policies in live snapshot")
             for i,policy in enumerate(models):
-                env = make_env(config.get("game","snake"),config["size"],config["max_steps"])
+                env = make_env(config.get("game","snake"),config["size"],config["max_steps"], config.get("game_config"))
                 obs = env.reset(self.replay_seed+i)
                 self.agents.append({"env":env,"policy":policy,"obs":obs,"seed":self.replay_seed+i,"steps":0,"episodes":0,"last":""})
             self.selected_agent=0
             self._spectator_display()
-            self.notify_status(f"Spectating {len(self.agents)} {'live worker' if live else 'saved'} policies; generation {data.get('generation','—') if snapshot.exists() else '—'}")
+            self.notify_status(f"Spectating {len(self.agents)} {'population replay' if live else 'champion replay'} policies; generation {data.get('generation','—') if snapshot.exists() and live else '—'}")
         except Exception as exc:
             self.query_one("#board",Static).update(f"Could not load spectator: {exc}")
 
     def _spectator_display(self):
-        if not self.agents:
+        if self._closing or not self.agents or not self.query("#board"):
             return
 
         grid = self.query_one("#board", Static)
@@ -409,6 +418,7 @@ class EvoForgeApp(App):
         detail.update(summary+"\n".join(lines_for(self.selected_agent)))
 
     def _replay_tick(self):
+        if self._closing or self.spectator_mode == 'live':return
         if not self.agents or time.monotonic()-self._last_replay_time < 1/self.replay_fps:return
         self._last_replay_time=time.monotonic()
         for i,a in enumerate(self.agents):
@@ -423,6 +433,39 @@ class EvoForgeApp(App):
                 a['steps']+=1
                 if done: a['last']=str(info)
         self._spectator_display()
+
+    def _poll_frames(self):
+        from .telemetry import FrameChannel
+        if not (self.directory/'telemetry.sqlite').exists():
+            return
+        try:
+            frames = FrameChannel(self.directory).read(self._frame_cursor)
+        except (OSError, __import__('sqlite3').OperationalError):
+            return
+        for event in frames:
+            self._frame_cursor = event['seq']
+            self._live_frames[event['agent']] = event
+        if self._live_frames:
+            panels = []
+            for agent, event in sorted(self._live_frames.items()):
+                panels.append(f"LIVE AGENT {agent} | Gen {event['generation']} | Step {event['step']} | Score {event['score']}\n" +
+                              str(event['data'].get('text', event['data'])))
+            self.query_one('#board', Static).update('\n\n'.join(panels))
+            self.query_one('#replay-note', Static).update('Actual sampled evaluation frames; sequence gaps indicate sampling or dropped frames.')
+
+    @on(Select.Changed, '#spectator-mode')
+    def change_spectator_mode(self, event):
+        self.spectator_mode = event.value
+        if event.value == 'live':
+            self._poll_frames()
+        else:
+            self._load_champion(live=event.value == 'population')
+
+    def on_unmount(self):
+        self._closing = True
+        from .games import close_env
+        for agent in self.agents:
+            close_env(agent['env'])
 
     @on(DataTable.RowSelected, "#experiments")
     def _experiment_row_selected(self, event):
