@@ -32,7 +32,10 @@ must be independently testable without FastAPI or Textual imports in the engine.
    PPO optimizer/RNG resume verified. Restricted legacy reader, checksums, atomic
    commits, corrupt-primary fallback and metric reconciliation tested.
    Stage checks: 30 passed (training v1, SDK, core, games, service, rewards).
-3. Persistent supervisor: pending.
+3. Persistent supervisor: implemented. Six real process tests passed in 16.54s:
+   startup, second-client controls, pause/resume/stop, duplicate races, SIGKILL
+   recovery, stale/PID identity rejection and launching-client exit + SIGHUP.
+   Actual SSH logout and systemd remain operator acceptance scenarios.
 4. Live telemetry: pending.
 5. REST/WebSocket API: pending.
 6. Analytics, Textual, documentation and release checks: pending.

@@ -25,6 +25,7 @@ def main():
     }.items():train.add_argument('--'+flag,**kwargs)
     train.add_argument('--output',default='runs/snake-hybrid')
     train.add_argument('--resume',action='store_true')
+    train.add_argument('--background',action='store_true')
     play=sub.add_parser('play',help='render a saved champion in the terminal')
     play.add_argument('checkpoint');play.add_argument('--seed',type=int,default=123)
     dash=sub.add_parser('dashboard',help='interactive terminal control center')
@@ -59,7 +60,31 @@ def main():
         cfg=Config(**{key.replace('-','_'):getattr(args,key.replace('-','_')) for key in
                  ('mode','game','population','generations','elites','ppo-candidates','ppo-episodes',
                   'eval-episodes','size','max-steps','seed','hidden')})
-        Trainer(cfg,args.output,resume=args.resume).run()
+        from .supervisor import Supervisor
+        from .core.checkpoints import atomic_json
+        import time
+        directory=Path(args.output).expanduser().resolve()
+        directory.mkdir(parents=True,exist_ok=True)
+        if (directory/'checkpoint.pt').exists() and not args.resume:
+            parser.error('Checkpoint exists: use --resume')
+        if args.resume and (directory/'config.json').exists():
+            cfg=Config(**json.loads((directory/'config.json').read_text()))
+        manager=Supervisor(directory.parent)
+        if not (directory/'config.json').exists():
+            atomic_json(directory/'config.json',__import__('dataclasses').asdict(cfg))
+        result=manager.start(directory.name)
+        print(json.dumps(result,indent=2))
+        if not args.background:
+            try:
+                while manager.inspect(directory.name)['status'] in ('STARTING','RUNNING','PAUSED','STOPPING'):
+                    time.sleep(0.2)
+            except KeyboardInterrupt:
+                print('Detached; worker continues. Use evoforge workers for control.')
+            else:
+                state=manager.inspect(directory.name)
+                print(json.dumps(state,indent=2))
+                if state['status']=='FAILED':
+                    raise SystemExit(1)
     elif args.command=='play':
         data=safe_load(args.checkpoint)
         cfg=data['config'];model=Policy(hidden=cfg['hidden']);model.load_state_dict(data['state_dict'])
