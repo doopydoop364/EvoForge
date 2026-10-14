@@ -156,3 +156,75 @@ class Supervisor:
 
     def workers(self):
         return [row for row in self.list() if row['worker']]
+
+    def update(self, experiment, config):
+        from evoforge.trainer import Config
+        cfg = config if isinstance(config, Config) else Config(**config)
+        cfg.validate()
+        path = self.path(experiment)
+        with self._edit_lock(experiment):
+            if (path / 'checkpoint.pt').exists():
+                previous = json.loads((path/'config.json').read_text())
+                old, new = asdict(Config(**previous)), asdict(cfg)
+                old.pop('generations')
+                new.pop('generations')
+                if old != new:
+                    raise WorkerConflict('Checkpointed config only permits generation extension')
+            atomic_json(path / 'config.json', asdict(cfg))
+            with self.database.connect() as db:
+                db.execute('UPDATE experiments SET config=?,updated=? WHERE id=?', (json.dumps(asdict(cfg)), time.time(), experiment))
+                self.database.event(db, experiment, 'configuration', {})
+        return self.inspect(experiment)
+
+    def duplicate(self, experiment, destination):
+        row = self.inspect(experiment)
+        return self.create(destination, json.loads((self.path(experiment)/'config.json').read_text()))
+
+    def rename(self, experiment, destination):
+        source, target = self.path(experiment), self.path(destination)
+        if target.exists():
+            raise WorkerConflict('Destination already exists')
+        with self._edit_lock(experiment):
+            source.rename(target)
+            try:
+                with self.database.connect() as db:
+                    db.execute('PRAGMA defer_foreign_keys=ON')
+                    db.execute('UPDATE experiments SET id=? WHERE id=?', (destination, experiment))
+                    for table in ('workers', 'metrics', 'events'):
+                        db.execute(f'UPDATE {table} SET experiment=? WHERE experiment=?', (destination, experiment))
+                    self.database.event(db, destination, 'renamed', {'previous': experiment})
+            except Exception:
+                target.rename(source)
+                raise
+        return self.inspect(destination)
+
+    def archive(self, experiment, archived=True):
+        with self._edit_lock(experiment):
+            with self.database.connect() as db:
+                db.execute('UPDATE experiments SET archived=? WHERE id=?', (int(archived), experiment))
+                self.database.event(db, experiment, 'archive', {'archived': archived})
+            marker = self.path(experiment)/'.archived'
+            if archived:
+                marker.touch()
+            else:
+                marker.unlink(missing_ok=True)
+        return self.inspect(experiment)
+
+    def _edit_lock(self, experiment):
+        from contextlib import contextmanager
+        @contextmanager
+        def locked():
+            row = self.inspect(experiment)
+            path = self.path(experiment)
+            fd = os.open(path/'.worker.lock', os.O_CREAT | os.O_RDWR, 0o600)
+            try:
+                try:
+                    fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                except BlockingIOError as exc:
+                    raise WorkerConflict('Stop the worker before editing this experiment') from exc
+                if self.inspect(experiment)['status'] in ACTIVE:
+                    raise WorkerConflict('Stop the worker before editing this experiment')
+                yield
+            finally:
+                os.close(fd)
+        return locked()

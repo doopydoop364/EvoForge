@@ -10,6 +10,11 @@ from .trainer import Trainer,Config
 def main():
     parser=argparse.ArgumentParser(description='EvoForge research MVP')
     sub=parser.add_subparsers(dest='command',required=True)
+    api=sub.add_parser('api',help='optional versioned API server')
+    api.add_argument('action',choices=['serve'])
+    api.add_argument('--root',default='runs')
+    api.add_argument('--host',default='127.0.0.1')
+    api.add_argument('--port',type=int,default=8765)
     games=sub.add_parser('games',help='inspect installed game plugins')
     games.add_argument('action',choices=['list','inspect','validate'])
     games.add_argument('game_id',nargs='?')
@@ -33,7 +38,11 @@ def main():
     tui=sub.add_parser('tui',help='Textual terminal app (install the tui extra)')
     tui.add_argument('--output',default='runs/hybrid')
     args=parser.parse_args(['dashboard'] if len(__import__('sys').argv)==1 else None)
-    if args.command=='games':
+    if args.command=='api':
+        import uvicorn
+        from .api.app import create_app
+        uvicorn.run(create_app(args.root,bind_host=args.host),host=args.host,port=args.port)
+    elif args.command=='games':
         from dataclasses import asdict
         from .games import available_games
         from .sdk import validate_game

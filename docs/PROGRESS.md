@@ -40,7 +40,10 @@ must be independently testable without FastAPI or Textual imports in the engine.
    actual evaluation frames, independent replay modes and Textual live consumer.
    Telemetry + baseline Textual tests: 3 passed. Baseline shutdown race fixed by
    guarding timer access after DOM removal; champion auto-reload removed.
-5. REST/WebSocket API: pending.
+5. API: implemented versioned typed routes, bearer authentication, remote-bind
+   guard, supervisor CRUD/control, event and live frame reconnect cursors. Three
+   API integration tests passed (including real worker controls and WebSockets).
+   New FastAPI/Starlette emits one upstream httpx deprecation warning.
 6. Analytics, Textual, documentation and release checks: pending.
 
 No stable release/tag is authorized. Keep 1.0.0rc1 until operator acceptance.
