@@ -44,7 +44,8 @@ must be independently testable without FastAPI or Textual imports in the engine.
    guard, supervisor CRUD/control, event and live frame reconnect cursors. Three
    API integration tests passed (including real worker controls and WebSockets).
    New FastAPI/Starlette emits one upstream httpx deprecation warning.
-6. Analytics, Textual, documentation and release checks: pending.
+6. Analytics, Textual, documentation and release checks: implemented.
+   Final local verification passed; operator-only acceptance remains open.
 
 No stable release/tag is authorized. Keep 1.0.0rc1 until operator acceptance.
 
@@ -61,10 +62,12 @@ CLI now has games, experiments, workers, API, doctor, migration, baseline and
 version commands; headless default gives help. GPU doctor executes a CUDA kernel
 when available instead of trusting availability alone. Training remains CPU.
 
-The full suite before the final two regression additions passed **66 tests** in
-52.58s (`.venv/bin/python -m pytest -q`), with one upstream Starlette httpx
-TestClient deprecation warning. Follow-up coverage preserves incomplete legacy
-CSV rows/scientific notation and metadata for an uninstalled external plugin.
+Final full suite: **68 passed, 1 warning in 50.82s**
+(`.venv/bin/python -m pytest -q`). The warning is upstream Starlette's httpx
+TestClient deprecation. Includes regression coverage for incomplete legacy CSV
+rows/scientific notation and metadata for an uninstalled external plugin.
+Marker collection verifies 16 integration tests, 3 Textual interaction tests,
+and 49 remaining unit/engine tests. All are included in the full-suite result.
 
 Real TCP transport integration starts a separate Uvicorn server, rejects missing
 HTTP credentials, streams frames over a real WebSocket and exports a champion.
@@ -89,3 +92,22 @@ package/quality jobs. These jobs are configured; do not infer remote results fro
 local testing. No actual SSH logout, systemd user service, host reboot, real
 terminal or GTX 1070 test was available. Reproducible operator procedures and
 known scaling/format boundaries are in RELEASE.md.
+
+
+## Reviewable commits
+
+| Commit | Change |
+| --- | --- |
+| f4fb88e | Game SDK, entry points, example plugin and policy factory |
+| 4649cad | Generic algorithms, PPO fix and safe checkpoint schema/recovery |
+| a0a62c5 | Durable supervisor, identities, locks and lifecycle controls |
+| 516b47f | Bounded actual gameplay telemetry and replay modes |
+| 167f10f | Authenticated REST/WebSocket API |
+| 7ebdbe8 | Terminal workflows, analytics, CLI, docs, CI and release checks |
+
+Development branch: https://github.com/doopydoop364/EvoForge/tree/feature/v1.0-universal-core
+
+No stable tag/release or merge has been performed. Package version is PEP 440
+`1.0.0rc1` (displayed in documentation as 1.0.0-rc.1). All requested implementation
+stages are present; the outstanding release gates are the operator acceptance
+items in RELEASE.md and remote CI results, not claims established by cloud mocks.

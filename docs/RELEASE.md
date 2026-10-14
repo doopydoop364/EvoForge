@@ -11,8 +11,25 @@ integrity-checked checkpoints; durable SQLite supervisor and metrics; real
 sampled gameplay frames; Textual controls, plugin/worker browser and analytics;
 versioned authenticated REST/WebSocket API; CLI, doctor, migrations, docs and CI.
 
-See PROGRESS.md for per-stage commits and recorded checks. Final exact automated
-counts and clean-package results are recorded there after release checks finish.
+Final local full suite: **68 passed, 1 upstream warning in 50.82s** on Python
+3.12.14 / CPU torch 2.14.1. Clean wheel installation independently completed all
+three external-plugin training modes, checkpoint/frame checks, API schema and
+Textual startup. Lint, formatting, wheel/sdist builds and archive checks passed.
+See PROGRESS.md for exact commands, per-stage commits and evidence.
+
+| Acceptance scenario | Cloud evidence | Remaining gate |
+| --- | --- | --- |
+| Clean install and external entry-point discovery | Passed in isolated wheel venv | Operator host installation |
+| External evolution / PPO / hybrid | Passed with 4 inputs, 2 actions | Longer benchmark quality assessment |
+| Disconnect survival | Real parent-exit + SIGHUP passed | Actual SSH logout policy |
+| Second client and pause/resume/stop | Real process and Textual controls passed | Real SSH terminal interaction |
+| Live frames into Textual | Actual evaluation frames passed | Native terminal rendering |
+| API controls and authentication | In-process and real TCP/WS passed | Remote TLS/SSH forwarding setup |
+| Checkpoint interruption and recovery | SIGKILL, corruption, RNG/optimizer resume passed | Host reboot/systemd test |
+| Existing Snake / Flappy runs | Pinned v0.9 runs resumed with backups | Operator historical dataset sample |
+| Analytics, export and comparison | Passed at matched step budgets | Operator workload scaling |
+| Automated UI/API/full suite | 3 Textual, 4 API/transport, 68 total passed | Remote Python 3.10–3.13 CI |
+| GTX 1070 | CPU fallback and doctor implemented | Actual CUDA kernel/driver validation |
 
 ## Compatibility
 
