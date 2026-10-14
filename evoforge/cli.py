@@ -9,10 +9,13 @@ from .trainer import Trainer,Config
 def main():
     parser=argparse.ArgumentParser(description='EvoForge research MVP')
     sub=parser.add_subparsers(dest='command',required=True)
+    games=sub.add_parser('games',help='inspect installed game plugins')
+    games.add_argument('action',choices=['list','inspect','validate'])
+    games.add_argument('game_id',nargs='?')
     train=sub.add_parser('train',help='run or resume experiment')
     for flag,kwargs in {
         'mode':dict(choices=['evolution','hybrid','ppo'],default='hybrid'),
-        'game':dict(choices=['snake','flappy'],default='snake'),
+        'game':dict(default='snake'),
         'population':dict(type=int,default=24),'generations':dict(type=int,default=20),
         'elites':dict(type=int,default=2),'ppo-candidates':dict(type=int,default=3),
         'ppo-episodes':dict(type=int,default=4),'eval-episodes':dict(type=int,default=3),
@@ -28,7 +31,21 @@ def main():
     tui=sub.add_parser('tui',help='Textual terminal app (install the tui extra)')
     tui.add_argument('--output',default='runs/hybrid')
     args=parser.parse_args(['dashboard'] if len(__import__('sys').argv)==1 else None)
-    if args.command=='tui':
+    if args.command=='games':
+        from dataclasses import asdict
+        from .games import available_games
+        from .sdk import validate_game
+        from .sdk.registry import ERRORS
+        if args.action=='list':
+            print(json.dumps({'games':available_games(),'errors':ERRORS},indent=2))
+        elif not args.game_id:
+            parser.error('game id required')
+        elif args.action=='validate':
+            print(json.dumps(validate_game(args.game_id),indent=2))
+        else:
+            spec=game_spec(args.game_id)
+            print(json.dumps({k:v for k,v in asdict(spec).items() if k!='environment'},indent=2))
+    elif args.command=='tui':
         try:
             from .tui import main as tui_main
         except ImportError:

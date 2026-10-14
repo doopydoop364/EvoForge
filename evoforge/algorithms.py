@@ -16,6 +16,8 @@ def mutate(parent, rng, probability=0.05, sigma=0.08):
 
 @torch.no_grad()
 def crossover(a,b,rng):
+    if a.architecture != b.architecture:
+        raise ValueError("Cannot cross incompatible policy architectures")
     child=a.clone()
     for dest,source in zip(child.parameters(),b.parameters()):
         mask=torch.from_numpy(rng.random(tuple(dest.shape))<0.5)

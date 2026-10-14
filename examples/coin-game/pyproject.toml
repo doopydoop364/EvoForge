@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+[project]
+name = "evoforge-example-coin"
+version = "1.0.0"
+requires-python = ">=3.10"
+dependencies = ["evoforge>=1.0.0rc1"]
+[project.entry-points."evoforge.games"]
+coin = "coin_game:CoinGame"
+[tool.setuptools.packages.find]
+include = ["coin_game*"]

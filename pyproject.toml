@@ -4,13 +4,14 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evoforge"
-version = "0.9.0"
+version = "1.0.0rc1"
 description = "EvoForge experiment engine with live worker spectating and run analytics"
 requires-python = ">=3.10"
-dependencies = ["numpy>=1.24", "torch>=2.1"]
+dependencies = ["numpy>=1.24", "torch>=2.1", "gymnasium>=1.0,<2"]
 
 [project.optional-dependencies]
-dev = ["pytest>=7"]
+dev = ["pytest>=7", "httpx>=0.27", "build>=1", "ruff>=0.9"]
+api = ["fastapi>=0.115,<1", "uvicorn>=0.30", "websockets>=13"]
 viewer = ["pygame-ce>=2.5"]
 tui = ["textual>=0.80,<9"]
 
