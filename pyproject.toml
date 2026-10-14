@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "evoforge"
+version = "0.9.0"
+description = "EvoForge experiment engine with live worker spectating and run analytics"
+requires-python = ">=3.10"
+dependencies = ["numpy>=1.24", "torch>=2.1"]
+
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+viewer = ["pygame-ce>=2.5"]
+tui = ["textual>=0.80,<9"]
+
+[project.scripts]
+evoforge = "evoforge.cli:main"
+
+[tool.setuptools.packages.find]
+include = ["evoforge*"]
