@@ -1,4 +1,5 @@
 """Persistent user interface preferences (independent of training runs)."""
+
 import json
 import os
 from pathlib import Path

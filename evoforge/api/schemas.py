@@ -1,11 +1,12 @@
 from typing import Any, Literal
+
 from pydantic import BaseModel, ConfigDict, Field
 
 
 class TrainingConfig(BaseModel):
-    model_config = ConfigDict(extra='forbid', strict=True)
-    mode: Literal['evolution', 'ppo', 'hybrid'] = 'hybrid'
-    game: str = 'snake'
+    model_config = ConfigDict(extra="forbid", strict=True)
+    mode: Literal["evolution", "ppo", "hybrid"] = "hybrid"
+    game: str = "snake"
     population: int = Field(24, ge=2, le=4096)
     generations: int = Field(20, ge=1, le=1000000)
     elites: int = Field(2, ge=1, le=4095)
@@ -23,9 +24,20 @@ class TrainingConfig(BaseModel):
 
 
 class ExperimentCreate(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    id: str = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$')
+    model_config = ConfigDict(extra="forbid")
+    id: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")
     config: TrainingConfig = Field(default_factory=TrainingConfig)
+
+
+class Worker(BaseModel):
+    experiment: str
+    identity: str
+    pid: int | None = None
+    incarnation: str | None = None
+    heartbeat: float
+    request: str | None = None
+    error: str | None = None
+    generation: int
 
 
 class Experiment(BaseModel):
@@ -37,7 +49,7 @@ class Experiment(BaseModel):
     game_version: str
     algorithm_version: int
     archived: int
-    worker: dict[str, Any] | None
+    worker: Worker | None
 
 
 class Game(BaseModel):
@@ -50,5 +62,5 @@ class Game(BaseModel):
 
 
 class NamedAction(BaseModel):
-    model_config = ConfigDict(extra='forbid')
-    destination: str = Field(pattern=r'^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$')
+    model_config = ConfigDict(extra="forbid")
+    destination: str = Field(pattern=r"^[A-Za-z0-9][A-Za-z0-9_-]{0,79}$")

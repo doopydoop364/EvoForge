@@ -47,3 +47,45 @@ must be independently testable without FastAPI or Textual imports in the engine.
 6. Analytics, Textual, documentation and release checks: pending.
 
 No stable release/tag is authorized. Keep 1.0.0rc1 until operator acceptance.
+
+## Operator integration and validation
+
+Stage 6 implementation includes shared supervisor controls in both terminal UIs,
+plugin/worker tabs, configurable widths/plugin JSON/mutation/budget forms,
+comparison/export controls, locked replays, responsive action grids and focus
+borders. Pilot tests exercise creation, invalid and valid submission, duplication,
+rename/archive, theme persistence, real start/pause/resume/stop, actual live frames,
+all three spectator modes and second-client reconnection after UI shutdown.
+
+CLI now has games, experiments, workers, API, doctor, migration, baseline and
+version commands; headless default gives help. GPU doctor executes a CUDA kernel
+when available instead of trusting availability alone. Training remains CPU.
+
+The full suite before the final two regression additions passed **66 tests** in
+52.58s (`.venv/bin/python -m pytest -q`), with one upstream Starlette httpx
+TestClient deprecation warning. Follow-up coverage preserves incomplete legacy
+CSV rows/scientific notation and metadata for an uninstalled external plugin.
+
+Real TCP transport integration starts a separate Uvicorn server, rejects missing
+HTTP credentials, streams frames over a real WebSocket and exports a champion.
+Legacy tests execute pinned v0.9 source for Snake and Flappy, then load/resume each
+with the new reader while preserving the original as the backup.
+
+Clean environment validation:
+
+- `uv venv /tmp/evoforge-rc-clean --python .venv/bin/python`
+- Installed CPU torch 2.14.1+cpu, built wheel with tui/api extras and the example
+  package, with no system-site-packages and no editable EvoForge installation.
+- Imported from the clean venv site-packages outside the repository.
+- External Coin evolution/PPO/hybrid each completed one supervised generation,
+  with measured interaction counts 56 / 64 / 84, each producing 15 real frames.
+- Checkpoint loading, optional API OpenAPI generation and Textual startup passed.
+- `uv pip check --python /tmp/evoforge-rc-clean/bin/python`: 38 packages compatible.
+- `.venv/bin/python -m build`: wheel and sdist passed.
+- Ruff lint/format and `git diff --check` passed.
+
+CI defines Python 3.10–3.13 unit jobs plus separate real integration, Textual and
+package/quality jobs. These jobs are configured; do not infer remote results from
+local testing. No actual SSH logout, systemd user service, host reboot, real
+terminal or GTX 1070 test was available. Reproducible operator procedures and
+known scaling/format boundaries are in RELEASE.md.

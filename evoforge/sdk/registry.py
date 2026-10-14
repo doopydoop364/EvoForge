@@ -1,6 +1,8 @@
 """Installed package discovery; no upload, path or network code loading."""
-from importlib.metadata import entry_points
+
 import re
+from importlib.metadata import entry_points
+
 from .game import GamePlugin, dimensions
 
 PLUGINS = {}
@@ -40,6 +42,7 @@ def discover(refresh=False):
 
 def create(game, config=None, max_steps=300):
     from .game import FlattenAdapter
+
     discover()
     if game not in PLUGINS:
         raise ValueError(f"Unknown installed game: {game}")

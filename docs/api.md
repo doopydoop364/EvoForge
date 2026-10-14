@@ -3,7 +3,8 @@
 Install the API extra. Localhost binding is the default. Set a private token for
 any remote binding (required by CLI and app factory); using a token locally is
 recommended. Every /api/v1 HTTP request requires `Authorization: Bearer TOKEN`
-when configured. WebSocket clients use the same header. Use SSH forwarding for
+when configured. WebSocket clients use the same header. Unauthorized connections are denied during
+the handshake (HTTP 403; the in-process application close code is 4401). Use SSH forwarding for
 remote administration; direct network exposure requires a TLS reverse proxy.
 OpenAPI schemas are at `/openapi.json`, interactive reference at `/docs`.
 

@@ -1,6 +1,8 @@
 """Public game contract. Plugins are explicitly installed Python packages."""
+
 from dataclasses import dataclass
 from typing import Any
+
 import numpy as np
 from gymnasium import spaces
 
@@ -19,6 +21,7 @@ class GamePlugin:
     truncated, info). Observations must be numeric Box arrays; actions Discrete.
     Constructor accepts **game_config. close() is always called by the engine.
     """
+
     info: GameInfo
     observation_space: spaces.Box
     action_space: spaces.Discrete
@@ -44,6 +47,7 @@ class GamePlugin:
 
 class FlattenAdapter:
     """Engine adapter; legacy consumers retain reset obs / four-tuple step."""
+
     def __init__(self, plugin, max_steps=300):
         self.plugin = plugin
         self.observation_size, self.action_size = dimensions(plugin)
@@ -55,11 +59,16 @@ class FlattenAdapter:
         self.episode_reward = 0.0
 
     def _observation(self, observation):
-        array = np.asarray(observation, dtype=np.float32)
+        array = np.asarray(observation)
         if array.shape != self.plugin.observation_space.shape:
-            raise ValueError(f"Observation shape {array.shape} differs from declared {self.plugin.observation_space.shape}")
+            raise ValueError(
+                f"Observation shape {array.shape} differs from declared {self.plugin.observation_space.shape}"
+            )
         if not np.isfinite(array).all() or not self.plugin.observation_space.contains(array):
             raise ValueError("Observation is nonfinite or outside declared space")
+        array = array.astype(np.float32)
+        if not np.isfinite(array).all():
+            raise ValueError("Observation cannot be represented as finite float32 values")
         return array.reshape(-1)
 
     def reset(self, seed=None):
@@ -67,7 +76,10 @@ class FlattenAdapter:
         self.steps = 0
         self.done = False
         self.episode_reward = 0.0
+        if not isinstance(info, dict):
+            raise ValueError("reset must return a metrics dict")
         self.last_info = info
+        self.score = float(info.get("score", 0))
         return self._observation(observation)
 
     def transition(self, action):
@@ -76,7 +88,11 @@ class FlattenAdapter:
         if not self.plugin.action_space.contains(action):
             raise ValueError("Action outside declared Discrete space")
         obs, reward, terminated, truncated, info = self.plugin.step(action)
-        if not isinstance(info, dict) or not isinstance(terminated, (bool, np.bool_)) or not isinstance(truncated, (bool, np.bool_)):
+        if (
+            not isinstance(info, dict)
+            or not isinstance(terminated, (bool, np.bool_))
+            or not isinstance(truncated, (bool, np.bool_))
+        ):
             raise ValueError("step requires boolean terminated/truncated and a metrics dict")
         reward = float(reward)
         if not np.isfinite(reward):

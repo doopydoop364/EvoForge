@@ -1,5 +1,5 @@
-from evoforge.policy import Policy
 from evoforge.games import make_env
+from evoforge.policy import Policy
 
 
 def policy_for(game="snake", hidden=64, game_config=None, size=10, max_steps=300):

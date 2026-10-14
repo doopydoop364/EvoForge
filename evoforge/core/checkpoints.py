@@ -1,10 +1,12 @@
 """Integrity checked, atomic tensor archives with restricted legacy readers."""
+
 import hashlib
 import io
 import os
-from pathlib import Path
 import shutil
 import tempfile
+from pathlib import Path
+
 import torch
 
 MAGIC = b"EVOFORGE-1\n"
@@ -37,6 +39,7 @@ def atomic_bytes(path, content):
 
 def atomic_json(path, data):
     import json
+
     atomic_bytes(path, json.dumps(data, indent=2, allow_nan=False).encode())
 
 
@@ -45,7 +48,7 @@ def safe_load(path):
     try:
         raw = Path(path).read_bytes()
         if raw.startswith(MAGIC):
-            digest, payload = raw[len(MAGIC):].split(b"\n", 1)
+            digest, payload = raw[len(MAGIC) :].split(b"\n", 1)
             if hashlib.sha256(payload).hexdigest().encode() != digest:
                 raise CheckpointError("Checkpoint integrity checksum mismatch")
         else:
@@ -60,7 +63,9 @@ def safe_load(path):
     except (OSError, CheckpointError):
         raise
     except Exception as exc:
-        raise CheckpointError(f"Cannot safely read {Path(path).name}: {exc}. No unsafe pickle fallback is permitted.") from exc
+        raise CheckpointError(
+            f"Cannot safely read {Path(path).name}: {exc}. No unsafe pickle fallback is permitted."
+        ) from exc
 
 
 def save(path, payload, backup=True):
@@ -87,14 +92,21 @@ def load_recovering(path):
         try:
             return safe_load(path.with_name(path.name + ".bak")), True
         except (OSError, CheckpointError) as backup:
-            raise CheckpointError(f"Primary and backup unusable: {primary}; backup: {backup}") from primary
+            raise CheckpointError(
+                f"Primary and backup unusable: {primary}; backup: {backup}"
+            ) from primary
 
 
 def migrate(path, dry_run=True):
     """Explicit conversion; preserve an immutable original alongside the file."""
     path = Path(path)
     data = safe_load(path)
-    result = {"path": str(path), "from_schema": data.get("schema_version", 0), "to_schema": SCHEMA_VERSION, "dry_run": dry_run}
+    result = {
+        "path": str(path),
+        "from_schema": data.get("schema_version", 0),
+        "to_schema": SCHEMA_VERSION,
+        "dry_run": dry_run,
+    }
     if not dry_run and data.get("schema_version", 0) == 0:
         backup = path.with_name(path.name + ".v090-original")
         if backup.exists():

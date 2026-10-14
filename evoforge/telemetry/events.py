@@ -1,10 +1,12 @@
 """Bounded cross-process telemetry. Nonblocking writes drop under backpressure."""
+
 import json
-from pathlib import Path
 import sqlite3
 import time
 import uuid
 import weakref
+from pathlib import Path
+
 from evoforge.games import frame, metric
 
 
@@ -13,10 +15,12 @@ class FrameChannel:
     max_bytes = 65536
 
     def __init__(self, directory):
-        self.path = Path(directory)/'telemetry.sqlite'
+        self.path = Path(directory) / "telemetry.sqlite"
         with sqlite3.connect(self.path, timeout=5) as db:
-            db.execute('PRAGMA journal_mode=WAL')
-            db.execute('CREATE TABLE IF NOT EXISTS frames (seq INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL)')
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute(
+                "CREATE TABLE IF NOT EXISTS frames (seq INTEGER PRIMARY KEY AUTOINCREMENT, data TEXT NOT NULL)"
+            )
 
     def publish(self, payload):
         raw = json.dumps(payload, allow_nan=False)
@@ -25,8 +29,11 @@ class FrameChannel:
         db = sqlite3.connect(self.path, timeout=0)
         try:
             with db:
-                db.execute('INSERT INTO frames(data) VALUES(?)', (raw,))
-                db.execute('DELETE FROM frames WHERE seq <= (SELECT MAX(seq)-? FROM frames)', (self.capacity,))
+                db.execute("INSERT INTO frames(data) VALUES(?)", (raw,))
+                db.execute(
+                    "DELETE FROM frames WHERE seq <= (SELECT MAX(seq)-? FROM frames)",
+                    (self.capacity,),
+                )
             return True
         except sqlite3.OperationalError:
             return False
@@ -35,8 +42,11 @@ class FrameChannel:
 
     def read(self, after=0):
         with sqlite3.connect(self.path, timeout=0.1) as db:
-            rows = db.execute('SELECT seq,data FROM frames WHERE seq>? ORDER BY seq LIMIT ?', (after, self.capacity)).fetchall()
-        return [{'seq': seq, **json.loads(raw)} for seq, raw in rows]
+            rows = db.execute(
+                "SELECT seq,data FROM frames WHERE seq>? ORDER BY seq LIMIT ?",
+                (after, self.capacity),
+            ).fetchall()
+        return [{"seq": seq, **json.loads(raw)} for seq, raw in rows]
 
 
 class TrainingPublisher:
@@ -52,19 +62,31 @@ class TrainingPublisher:
 
     def __call__(self, env, episode, reward, terminated, truncated, generation, agent, phase):
         # Sample evaluation frames; PPO rollouts are not spectator episodes.
-        if phase not in ('training', 'validation') or agent >= 3:
+        if phase not in ("training", "validation") or agent >= 3:
             return
         now = time.monotonic()
         if env.steps == 1 or env not in self.episodes:
             self.episodes[env] = uuid.uuid4().hex
-        if now-self.last < self.sample_interval and not (terminated or truncated):
+        if now - self.last < self.sample_interval and not (terminated or truncated):
             return
         self.last = now
-        payload = {'experiment': self.experiment, 'worker': self.worker_identity,
-            'game': self.game, 'generation': generation, 'agent': str(agent),
-            'episode': self.episodes[env], 'episode_index': episode,
-            'timestamp': time.time(), 'step': env.steps, 'score': metric(env),
-            'reward': float(reward), 'terminated': bool(terminated), 'truncated': bool(truncated),
-            'phase': phase, 'data': frame(env), 'dropped': self.dropped}
+        payload = {
+            "experiment": self.experiment,
+            "worker": self.worker_identity,
+            "game": self.game,
+            "generation": generation,
+            "agent": str(agent),
+            "episode": self.episodes[env],
+            "episode_index": episode,
+            "timestamp": time.time(),
+            "step": env.steps,
+            "score": metric(env),
+            "reward": float(reward),
+            "terminated": bool(terminated),
+            "truncated": bool(truncated),
+            "phase": phase,
+            "data": frame(env),
+            "dropped": self.dropped,
+        }
         if not self.channel.publish(payload):
             self.dropped += 1

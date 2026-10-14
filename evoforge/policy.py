@@ -1,4 +1,5 @@
 """Configurable CPU actor-critic; legacy two-layer state keys stay compatible."""
+
 import torch
 from torch import nn
 
@@ -7,7 +8,9 @@ class Policy(nn.Module):
     def __init__(self, input_size=17, hidden=64, actions=3):
         super().__init__()
         widths = [hidden, hidden] if isinstance(hidden, int) else list(hidden)
-        if not widths or any(not isinstance(n, int) or n < 1 for n in [input_size, actions, *widths]):
+        if not widths or any(
+            not isinstance(n, int) or n < 1 for n in [input_size, actions, *widths]
+        ):
             raise ValueError("Policy dimensions and hidden widths must be positive integers")
         self.architecture = {"input_size": input_size, "hidden": widths, "actions": actions}
         layers = []
@@ -28,7 +31,11 @@ class Policy(nn.Module):
         logits, _ = self(torch.as_tensor(obs, dtype=torch.float32).reshape(1, -1))
         if deterministic:
             return int(logits.argmax(dim=-1).item())
-        return int(torch.multinomial(torch.softmax(logits.squeeze(0), dim=-1), 1, generator=generator).item())
+        return int(
+            torch.multinomial(
+                torch.softmax(logits.squeeze(0), dim=-1), 1, generator=generator
+            ).item()
+        )
 
     def clone(self):
         other = Policy(**self.architecture)

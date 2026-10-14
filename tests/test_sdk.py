@@ -1,19 +1,22 @@
 import numpy as np
 import pytest
 from gymnasium import spaces
-from evoforge.sdk import GameInfo, GamePlugin, register, validate_game
-from evoforge.sdk.registry import discover
-from evoforge.games import make_env
+
 from evoforge.agents import policy_for
 from evoforge.algorithms import crossover
+from evoforge.games import make_env
+from evoforge.sdk import GameInfo, GamePlugin, register, validate_game
+from evoforge.sdk.registry import discover
 
 
 class WideGame(GamePlugin):
     info = GameInfo("wide-test", "Wide test")
     observation_space = spaces.Box(-1, 1, (3, 2), dtype=np.float32)
     action_space = spaces.Discrete(5)
+
     def reset(self, seed=None, options=None):
         return np.zeros((3, 2), dtype=np.float32), {}
+
     def step(self, action):
         return self.reset()[0], 1.0, True, False, {"score": 7}
 
@@ -40,18 +43,24 @@ def test_dimensions_flatten_fitness_and_architecture():
 def test_invalid_plugins_have_readable_failures():
     class Bad(WideGame):
         info = GameInfo("bad-version", "Bad", sdk_version=99)
+
     with pytest.raises(ValueError, match="SDK version"):
         register(Bad)
+
     class BadSpace(WideGame):
         info = GameInfo("bad-space", "Bad Space")
         action_space = spaces.Box(-1, 1, (2,))
+
     register(BadSpace)
     with pytest.raises(ValueError, match="Discrete"):
         validate_game("bad-space")
+
     class BadReset(WideGame):
         info = GameInfo("bad-reset", "Bad Reset")
+
         def reset(self, seed=None, options=None):
             return np.ones((2, 3), dtype=np.float32), {}
+
     register(BadReset)
     with pytest.raises(ValueError, match="shape"):
         validate_game("bad-reset")
