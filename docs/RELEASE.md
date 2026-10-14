@@ -11,7 +11,7 @@ integrity-checked checkpoints; durable SQLite supervisor and metrics; real
 sampled gameplay frames; Textual controls, plugin/worker browser and analytics;
 versioned authenticated REST/WebSocket API; CLI, doctor, migrations, docs and CI.
 
-Final local full suite: **68 passed, 1 upstream warning in 50.82s** on Python
+Final local full suite: **88 passed, 1 upstream warning in 106.44s** on Python
 3.12.14 / CPU torch 2.14.1. Clean wheel installation independently completed all
 three external-plugin training modes, checkpoint/frame checks, API schema and
 Textual startup. Lint, formatting, wheel/sdist builds and archive checks passed.
@@ -28,7 +28,7 @@ See PROGRESS.md for exact commands, per-stage commits and evidence.
 | Checkpoint interruption and recovery | SIGKILL, corruption, RNG/optimizer resume passed | Host reboot/systemd test |
 | Existing Snake / Flappy runs | Pinned v0.9 runs resumed with backups | Operator historical dataset sample |
 | Analytics, export and comparison | Passed at matched step budgets | Operator workload scaling |
-| Automated UI/API/full suite | 3 Textual, 4 API/transport, 68 total passed | Remote Python 3.10–3.13 CI |
+| Automated UI/API/full suite | Textual at 80/100/120/160 columns, API/transport, 88 total passed | Remote Python 3.10–3.13 CI |
 | GTX 1070 | CPU fallback and doctor implemented | Actual CUDA kernel/driver validation |
 
 ## Compatibility

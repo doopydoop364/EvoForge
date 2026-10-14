@@ -41,10 +41,20 @@ class FrameChannel:
             db.close()
 
     def read(self, after=0):
-        with sqlite3.connect(self.path, timeout=0.1) as db:
+        return self.read_existing(self.path.parent, after)
+
+    @classmethod
+    def read_existing(cls, directory, after=0):
+        """Read a persisted ring without creating a database or changing its schema.
+
+        Spectators must not run writer initialization on every poll. Missing or
+        unreadable storage raises a SQLite error for the client to report.
+        """
+        path = (Path(directory) / "telemetry.sqlite").resolve()
+        with sqlite3.connect(path.as_uri() + "?mode=ro", uri=True, timeout=0.1) as db:
             rows = db.execute(
                 "SELECT seq,data FROM frames WHERE seq>? ORDER BY seq LIMIT ?",
-                (after, self.capacity),
+                (after, cls.capacity),
             ).fetchall()
         return [{"seq": seq, **json.loads(raw)} for seq, raw in rows]
 

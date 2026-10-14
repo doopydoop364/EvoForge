@@ -1,13 +1,14 @@
 """Textual frontend. Imported only when the optional tui extra is installed."""
 
 import json
+import sqlite3
 import subprocess
 import time
 from pathlib import Path
 
 from textual import on
 from textual.app import App, ComposeResult
-from textual.containers import Horizontal, VerticalScroll
+from textual.containers import Grid, Horizontal, VerticalScroll
 from textual.reactive import reactive
 from textual.widgets import (
     Button,
@@ -23,7 +24,7 @@ from textual.widgets import (
     TabPane,
 )
 
-from .core.checkpoints import atomic_json, safe_load
+from .core.checkpoints import atomic_json
 from .dashboard import (
     SETTINGS_FIELDS,
     _history,
@@ -33,9 +34,52 @@ from .dashboard import (
     _spark,
     _validate_settings,
 )
-from .games import available_games, game_spec, make_env
+from .games import available_games, game_spec
 from .preferences import load_preferences, save_preferences
 from .supervisor import Supervisor
+from .supervisor.lifecycle import ACTIVE
+from .telemetry import FrameChannel, Replay
+
+
+class ResponsiveActions(Grid):
+    """Content-sized button columns that wrap within the available terminal width."""
+
+    DEFAULT_CSS = """
+    ResponsiveActions {
+        height: auto;
+        grid-rows: 3;
+        grid-gutter: 1 1;
+        margin: 1 0;
+    }
+    ResponsiveActions Button { width: 1fr; min-width: 0; height: 3; margin: 0; }
+    """
+
+    def on_mount(self):
+        self.call_after_refresh(self._reflow)
+
+    def on_resize(self):
+        self._reflow()
+
+    def _reflow(self):
+        buttons = list(self.query_children(Button))
+        width = self.content_size.width
+        if not buttons or width <= 0:
+            return
+        cell_width = min(
+            width,
+            max(
+                16,
+                *(
+                    b.get_content_width(self.size, self.size) + b.styles.gutter.width
+                    for b in buttons
+                ),
+            ),
+        )
+        columns = min(len(buttons), max(1, (width + 1) // (cell_width + 1)))
+        rows = (len(buttons) + columns - 1) // columns
+        self.styles.grid_size_columns = columns
+        self.styles.grid_columns = str(cell_width)
+        self.styles.height = rows * 3 + (rows - 1)
 
 
 class EvoForgeApp(App):
@@ -45,12 +89,13 @@ class EvoForgeApp(App):
     Screen { background: #101820; }
     Header { background: #15322c; color: #c0fbe5; }
     TabbedContent { height: 1fr; }
-    TabPane { padding: 1 2; }
+    TabPane { padding: 1 2; overflow-y: auto; }
     .panel { border: round #39705f; padding: 1 2; margin-bottom: 1; height: auto; }
     .heading { color: #83e6bd; text-style: bold; margin: 0 0 1 0; }
-    .actions { height: auto; margin: 1 0; layout: grid; grid-size: 3; grid-rows: 3; }
     Button:focus, Input:focus, Select:focus { border: heavy #a6f7d3; }
-    .actions Button { margin-right: 1; }
+    #new-name { width: 1fr; }
+    #spectator-controls { height: auto; max-height: 10; }
+    #spectator-controls ResponsiveActions { margin: 0 0 1 0; }
     .field { height: 3; margin-bottom: 1; }
     .field Label { width: 23; padding-top: 1; }
     .field Input, .field Select { width: 1fr; }
@@ -95,6 +140,7 @@ class EvoForgeApp(App):
         self.replay_checkpoint_mtime = None
         self.last_log = ""
         self.agents = []
+        self._replay = None
         self.selected_agent = 0
         self.spectator_multi = True
         self.replay_fps = 7
@@ -119,22 +165,22 @@ class EvoForgeApp(App):
                 yield Static("", id="metrics", classes="panel")
                 yield Static("", id="chart", classes="panel")
                 yield Static("Resource monitoring unavailable", id="resource", classes="panel")
-                with Horizontal(classes="actions"):
+                with ResponsiveActions(classes="actions"):
                     yield Button("Start / Resume", id="start", variant="success")
                     yield Button("Pause / Continue", id="pause")
                     yield Button("Stop", id="stop", variant="error")
                     yield Button("Extend +100", id="extend")
             with TabPane("Experiments", id="experiments-tab"):
                 yield Static("EXPERIMENT LIBRARY", classes="heading")
-                with Horizontal(classes="actions"):
+                yield Input(placeholder="Run name / rename destination", id="new-name")
+                with ResponsiveActions(classes="actions"):
                     yield Button("Refresh list", id="list-runs")
                     yield Button("Create run", id="new-run", variant="primary")
-                    yield Input(placeholder="Run name / rename destination", id="new-name")
                 yield DataTable(id="experiments", cursor_type="row")
                 yield Static(
                     "Select a row and click Open; experiments are kept in separate directories."
                 )
-                with Horizontal(classes="actions"):
+                with ResponsiveActions(classes="actions"):
                     yield Button("Open selected", id="open-run", variant="success")
                     yield Button("Duplicate", id="duplicate-run")
                     yield Button("Rename", id="rename-run")
@@ -151,19 +197,21 @@ class EvoForgeApp(App):
                     value="live",
                     allow_blank=False,
                 )
-                with Horizontal(classes="actions"):
-                    yield Button("Load champion", id="load-champion", variant="primary")
-                    yield Button("Restart episode", id="restart-replay")
-                    yield Button("Pause selected", id="toggle-replay")
-                    yield Button("Grid / Focus", id="grid-replay")
-                    yield Button("Next agent", id="next-agent")
-                    yield Button("Slower", id="slow-replay")
-                    yield Button("Faster", id="fast-replay")
-                    yield Button("Density", id="density-replay")
-                    yield Button("Split", id="split-replay")
-                    yield Button("Show all", id="all-replay")
-                yield Static("No champion loaded.", id="board", classes="panel")
-                yield Static("Selected agent: champion", id="agent-board", classes="panel")
+                with VerticalScroll(id="spectator-controls"):
+                    with ResponsiveActions(classes="actions"):
+                        yield Button("Load champion", id="load-champion", variant="primary")
+                        yield Button("Restart episode", id="restart-replay")
+                        yield Button("Pause selected", id="toggle-replay")
+                        yield Button("Slower", id="slow-replay")
+                        yield Button("Faster", id="fast-replay")
+                    with ResponsiveActions(classes="actions"):
+                        yield Button("Grid / Focus", id="grid-replay")
+                        yield Button("Next agent", id="next-agent")
+                        yield Button("Density", id="density-replay")
+                        yield Button("Split", id="split-replay")
+                        yield Button("Show all", id="all-replay")
+                yield Static("", id="board", classes="panel")
+                yield Static("", id="agent-board", classes="panel")
                 yield Static(
                     "Saved policy replays are independent of active training workers.",
                     id="replay-note",
@@ -173,7 +221,7 @@ class EvoForgeApp(App):
                 yield Static("", id="analytics-text", classes="panel")
                 yield Static("", id="analytics-breakdown", classes="panel")
                 yield Input(placeholder="Run ids separated by commas", id="compare-runs")
-                with Horizontal(classes="actions"):
+                with ResponsiveActions(classes="actions"):
                     yield Button("Compare step budgets", id="compare-runs-button")
                     yield Button("Export JSON", id="export-json")
                     yield Button("Export CSV", id="export-csv")
@@ -198,7 +246,7 @@ class EvoForgeApp(App):
                 yield Static(
                     "Choose a new run to edit settings; checkpointed settings are protected. Presets are starting points, not guarantees."
                 )
-                with Horizontal(classes="actions"):
+                with ResponsiveActions(classes="actions"):
                     yield Button("Quick Snake", id="preset-snake")
                     yield Button("Flappy Hybrid", id="preset-flappy")
                     yield Button("CPU Lite", id="preset-lite")
@@ -275,7 +323,8 @@ class EvoForgeApp(App):
         return self.runs_root
 
     def _open_directory(self, directory):
-        self.directory = Path(directory)
+        self._close_replay()
+        self.directory = Path(directory).expanduser().resolve()
         self.directory.mkdir(parents=True, exist_ok=True)
         if not (self.directory / "config.json").exists():
             atomic_json(self.directory / "config.json", _settings_defaults())
@@ -284,10 +333,9 @@ class EvoForgeApp(App):
         self.query_one("#logs", Log).clear()
         self._load_settings()
         self._list_runs()
-        self._load_champion()
-        self.spectator_mode = "live"
         self._frame_cursor = 0
         self._live_frames = {}
+        self._set_spectator_mode("live")
         self._refresh()
         self.notify_status(f"Opened {self.directory}")
 
@@ -406,10 +454,10 @@ class EvoForgeApp(App):
         except (OSError, ValueError):
             pass
         rows = _history(self.directory / "metrics.csv")
-        if self.spectator_mode == "live":
-            self._poll_frames()
         latest = rows[-1] if rows else {}
         info = self.manager.inspect(self.directory.name)
+        if self.spectator_mode == "live":
+            self._poll_frames(info)
         status = info["status"].title()
         self.paused = info["status"] == "PAUSED"
         workers_table = self.query_one("#workers", DataTable)
@@ -471,85 +519,79 @@ class EvoForgeApp(App):
                 log.write_line(line)
             self.last_log = content
 
-    def _load_champion(self, live=False):
-        from .agents import policy_for
-        from .games import close_env
-
-        for agent in self.agents:
-            close_env(agent["env"])
-        self.spectator_mode = "population" if live else "champion"
+    def _close_replay(self):
+        if self._replay is not None:
+            self._replay.close()
+            self._replay = None
         self.agents = []
         self._spectator_paused.clear()
-        champion = self.directory / "champion.pt"
-        snapshot = self.directory / "spectator.pt"
-        if not champion.exists() and not snapshot.exists():
-            self.query_one("#board", Static).update(
-                "Waiting for the trainer's first live policy snapshot…"
-                if live
-                else "No champion or live policy snapshot yet."
-            )
-            self.query_one("#agent-board", Static).update("")
+
+    def _set_spectator_mode(self, mode, *, reload=False):
+        if mode not in ("live", "champion", "population"):
+            return
+        selector = self.query_one("#spectator-mode", Select)
+        # One synchronous path owns both displayed selection and actual behavior.
+        with selector.prevent(Select.Changed):
+            selector.value = mode
+        changed = mode != self.spectator_mode
+        self.spectator_mode = mode
+        if mode == "live":
+            self._close_replay()
+            self._poll_frames()
+        elif changed or reload or self._replay is None:
+            self._load_replay(mode)
+
+    def _load_champion(self, live=False):
+        """Compatibility wrapper: the old 'live' argument loads population replay."""
+        self._set_spectator_mode("population" if live else "champion", reload=True)
+
+    def _spectator_message(self, message):
+        self.query_one("#board", Static).update(message)
+        self.query_one("#agent-board", Static).update("")
+        self.query_one("#replay-note", Static).update(
+            f"Experiment {self.directory.name} · {self.directory}"
+        )
+
+    def _load_replay(self, mode):
+        self._close_replay()
+        filename = "champion.pt" if mode == "champion" else "spectator.pt"
+        if not (self.directory / filename).is_file():
+            if mode == "champion":
+                message = "No champion is available for this run. Finish a generation or choose Live Training."
+            else:
+                message = "No population snapshot is available for this run. Finish a generation or choose Live Training."
+            self._spectator_message(message)
             return
         try:
-            from .viewer import load_champion
-
-            if champion.exists():
-                model, config = load_champion(champion)
-                models = [model]
-            else:
-                models = []
-                config = {}
-            if snapshot.exists() and live:
-                data = safe_load(snapshot)
-                snap_cfg = data.get("config", {})
-                if not config:
-                    config = snap_cfg
-                if all(
-                    snap_cfg.get(k, config.get(k)) == config.get(k)
-                    for k in ("game", "size", "hidden")
-                ):
-                    for weights in data.get("policies", [])[:9]:
-                        policy = policy_for(
-                            config.get("game", "snake"),
-                            config["hidden"],
-                            config.get("game_config"),
-                            config["size"],
-                            config["max_steps"],
-                        )
-                        policy.load_state_dict(weights)
-                        policy.eval()
-                        models.append(policy)
-            if not models:
-                raise ValueError("no compatible policies in live snapshot")
-            for i, policy in enumerate(models):
-                env = make_env(
-                    config.get("game", "snake"),
-                    config["size"],
-                    config["max_steps"],
-                    config.get("game_config"),
-                )
-                obs = env.reset(self.replay_seed + i)
-                self.agents.append(
-                    {
-                        "env": env,
-                        "policy": policy,
-                        "obs": obs,
-                        "seed": self.replay_seed + i,
-                        "steps": 0,
-                        "episodes": 0,
-                        "last": "",
-                    }
-                )
+            # Population replay depends only on spectator.pt, even if champion.pt
+            # is missing, corrupt or belongs to an incompatible old architecture.
+            self._replay = Replay(self.directory, mode, seed=self.replay_seed)
+            self.agents = self._replay.agents
+            if not self.agents:
+                raise ValueError("The saved population snapshot contains no policies")
+            for agent in self.agents:
+                agent.update(steps=0, episodes=0, last="")
             self.selected_agent = 0
             self._spectator_display()
-            self.notify_status(
-                f"Spectating {len(self.agents)} {'population replay' if live else 'champion replay'} policies; generation {data.get('generation', '—') if snapshot.exists() and live else '—'}"
+            label = "Champion Replay" if mode == "champion" else "Population Replay"
+            self.query_one("#replay-note", Static).update(
+                f"{label} · Experiment {self.directory.name} · {self.directory}\n"
+                "Independent saved-policy replay; locked until manually loaded again."
             )
+            self.notify_status(f"Loaded {label}: {len(self.agents)} policies")
         except Exception as exc:
-            self.query_one("#board", Static).update(f"Could not load spectator: {exc}")
+            self._close_replay()
+            self._spectator_message(
+                f"Could not load {mode} replay for {self.directory.name}: {exc}"
+            )
 
     def _spectator_display(self):
-        if self._closing or not self.agents or not self.query("#board"):
+        if (
+            self._closing
+            or self.spectator_mode == "live"
+            or not self.agents
+            or not self.query("#board")
+        ):
             return
 
         grid = self.query_one("#board", Static)
@@ -561,7 +603,7 @@ class EvoForgeApp(App):
         def lines_for(i, dense=False):
             agent = self.agents[i]
             env = agent["env"]
-            title = "CHAMPION" if i == 0 else f"AGENT {i}"
+            title = "CHAMPION" if self.spectator_mode == "champion" else f"AGENT {i}"
             title = ("> " if i == self.selected_agent else "  ") + title
             food = getattr(env, "food_eaten", None)
             if food is None:
@@ -618,7 +660,7 @@ class EvoForgeApp(App):
         env = agent["env"]
         score = getattr(env, "food_eaten", getattr(env, "score", 0))
         summary = (
-            f"Selected: {'CHAMPION' if self.selected_agent == 0 else f'AGENT {self.selected_agent}'}"
+            f"Selected: {'CHAMPION' if self.spectator_mode == 'champion' else f'AGENT {self.selected_agent}'}"
             f"  | Score: {score} | Episode: {agent['episodes'] + 1} | "
             f"Step: {agent['steps']} | Speed: {self.replay_fps}/s\n"
             f"Grid: {len(visible)}/{len(self.agents)} agents | Density: {self.spectator_density}"
@@ -649,44 +691,74 @@ class EvoForgeApp(App):
                     a["last"] = str(info)
         self._spectator_display()
 
-    def _poll_frames(self):
-        from .telemetry import FrameChannel
-
-        if not (self.directory / "telemetry.sqlite").exists():
+    def _poll_frames(self, info=None):
+        if self._closing or not self.query("#board"):
             return
+        info = info or self.manager.inspect(self.directory.name)
+        state = info["status"]
         try:
-            frames = FrameChannel(self.directory).read(self._frame_cursor)
-        except (OSError, __import__("sqlite3").OperationalError):
+            frames = (
+                FrameChannel.read_existing(self.directory, self._frame_cursor)
+                if (self.directory / "telemetry.sqlite").exists()
+                else []
+            )
+        except (OSError, sqlite3.Error, ValueError) as exc:
+            self._spectator_message(
+                f"Cannot read gameplay telemetry for {self.directory.name}: {exc}. "
+                "Check storage permissions and worker Logs, then refresh."
+            )
             return
         for event in frames:
             self._frame_cursor = event["seq"]
             self._live_frames[event["agent"]] = event
-        if self._live_frames:
-            panels = []
-            for agent, event in sorted(self._live_frames.items()):
-                panels.append(
-                    f"LIVE AGENT {agent} | Gen {event['generation']} | Step {event['step']} | Score {event['score']}\n"
-                    + str(event["data"].get("text", event["data"]))
+        if not self._live_frames:
+            if state in ACTIVE or state == "RECOVERING":
+                message = f"Worker {state.lower()}; awaiting its first gameplay frame."
+                if state == "PAUSED":
+                    message += " Resume the worker in Overview to continue evaluation."
+            elif state == "CREATED" and not any(
+                (self.directory / name).exists()
+                for name in ("checkpoint.pt", "metrics.csv", "champion.pt", "spectator.pt")
+            ):
+                message = "This run has never trained. Start a worker in Overview to receive gameplay frames."
+            else:
+                message = (
+                    f"Run {state.lower()}; no recorded gameplay frames are available. "
+                    "Choose Champion Replay or Population Replay for saved policies. "
+                    "v0.9 runs did not record live telemetry."
                 )
-            self.query_one("#board", Static).update("\n\n".join(panels))
-            self.query_one("#replay-note", Static).update(
-                "Actual sampled evaluation frames; sequence gaps indicate sampling or dropped frames."
+            self._spectator_message(message)
+            return
+        live = state in ACTIVE
+        label = "LIVE" if live else "SAVED"
+        panels = []
+        for agent, event in sorted(self._live_frames.items()):
+            panels.append(
+                f"{label} AGENT {agent} | Gen {event['generation']} | Step {event['step']} | Score {event['score']}\n"
+                + str(event["data"].get("text", event["data"]))
             )
+        self.query_one("#board", Static).update("\n\n".join(panels))
+        self.query_one("#agent-board", Static).update(
+            f"Experiment: {self.directory.name} | Worker: {state.lower()} | Last sequence: {self._frame_cursor}"
+        )
+        self.query_one("#replay-note", Static).update(
+            f"Experiment {self.directory.name} · {self.directory}\n"
+            + (
+                "Actual sampled evaluation frames; sequence gaps reflect sampling or dropped frames."
+                if live
+                else "Showing saved gameplay frames from previous evaluations. Choose a replay mode for continuous playback."
+            )
+        )
 
     @on(Select.Changed, "#spectator-mode")
     def change_spectator_mode(self, event):
-        self.spectator_mode = event.value
-        if event.value == "live":
-            self._poll_frames()
-        else:
-            self._load_champion(live=event.value == "population")
+        # Discard queued changes superseded by opening a run or a manual load.
+        if event.value == self.query_one("#spectator-mode", Select).value:
+            self._set_spectator_mode(event.value)
 
     def on_unmount(self):
         self._closing = True
-        from .games import close_env
-
-        for agent in self.agents:
-            close_env(agent["env"])
+        self._close_replay()
 
     @on(DataTable.RowSelected, "#experiments")
     def _experiment_row_selected(self, event):

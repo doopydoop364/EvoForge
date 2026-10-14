@@ -46,3 +46,23 @@ Plugins lists installed games and validation results. Install reviewed packages
 outside the app, then restart it to refresh entry-point discovery. Workers shows
 identity-backed state, generation, PID and health. Logs reads worker output;
 hardware load/RAM and available nvidia-smi data are informational.
+
+## RC1 spectator and layout stabilization
+
+Opening a run starts in Live Training and reads retained frames directly from
+that run's telemetry.sqlite. The run name and absolute directory appear below
+the display. A finished run shows saved gameplay frames; continuous simulation
+requires Champion Replay or Population Replay. Live mode distinguishes a run
+that has never trained, a worker awaiting its first frame, and historical runs
+without recorded telemetry. Storage/permission errors are shown explicitly.
+
+Load champion now selects Champion Replay as well as loading its policy. The
+mode selector and actual renderer always agree. Population Replay loads only
+spectator.pt, so a missing or damaged champion does not block it. Compatible
+v0.9 Snake/Flappy policy files still load; they contain replays, not live frames.
+Changing runs clears the previous frame cursor, cached frames and replay agents.
+
+Action groups size their columns from button labels and wrap as the terminal
+narrows. The run-name field has its own full-width row. Spectator playback and
+view controls stay grouped in a scrollable area; Tab/Shift+Tab scroll focused
+buttons into view. Tab contents can also scroll on short terminals.

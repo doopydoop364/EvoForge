@@ -111,3 +111,64 @@ No stable tag/release or merge has been performed. Package version is PEP 440
 `1.0.0rc1` (displayed in documentation as 1.0.0-rc.1). All requested implementation
 stages are present; the outstanding release gates are the operator acceptance
 items in RELEASE.md and remote CI results, not claims established by cloud mocks.
+
+## RC1 spectator and action-layout stabilization
+
+Focused follow-up to CachyOS/Konsole testing; package remains 1.0.0rc1.
+
+Root causes reproduced against e3ba767:
+
+- Opening a run unconditionally loaded a champion and painted its missing-file
+  message before changing an internal mode flag to live.
+- Load champion changed the internal mode without updating the selector, leaving
+  a visible Live Training selection that no longer polled real telemetry.
+- Live polling returned silently without replacing replay/empty content when no
+  database/frames existed, and left stale champion detail content behind.
+- Population replay unnecessarily depended on loading the champion first.
+- Every telemetry poll initialized writer pragmas/schema and swallowed storage
+  errors, obscuring a failed read.
+- One fixed three-column grid sized every action group alike, placed the run-name
+  input in a button cell, and provided no narrow/short-terminal scrolling plan.
+
+The worker path was verified: Trainer evaluation callbacks -> TrainingPublisher
+-> per-experiment bounded SQLite WAL ring -> read-only frame query -> Textual.
+No artificial gameplay frames or reward/training changes were introduced.
+
+Fixes centralize mode selection, use independent shared Replay loaders, reset
+run-specific replay/frame state, and show distinct mode/lifecycle empty states
+and visible read errors. Completed runs retain accessible recorded frames. Reusable
+ResponsiveActions measures button labels, chooses fitting columns/row height,
+and preserves gaps and focus borders. Inputs stay outside the button grid;
+related spectator controls and short tab content scroll.
+
+Regression coverage includes real worker start and second-client reconnection,
+completed-run recordings, run switching, champion locking, all mode transitions,
+legacy Snake/Flappy artifacts, valid population replay with a damaged champion,
+empty states, read-only queries during a WAL write lock, and action geometry,
+keyboard focus and resizing at widths 80/100/120/160 and heights 24/50.
+
+Baseline: `.venv/bin/python -m pytest -q`: 68 passed, 1 upstream warning, 53.99s.
+Targeted spectator/interactions: 14 passed in 33.29s. Layout checks: 9 passed in
+39.82s.
+
+Final `.venv/bin/python -m pytest -q`: **88 passed, 1 warning in 106.44s**.
+The warning remains Starlette's upstream httpx TestClient deprecation. The suite
+includes 20 added regression cases. `.venv/bin/ruff check evoforge tests examples`,
+`.venv/bin/ruff format --check evoforge tests examples` (61 files), and
+`git diff --check` passed. No training algorithms, package version, or existing
+experiment artifacts were changed.
+
+Update an existing CachyOS checkout (fish-compatible):
+
+```sh
+cd ~/EvoForge
+git switch feature/v1.0-universal-core
+git pull --ff-only origin feature/v1.0-universal-core
+.venv/bin/python -m pip install -e '.[tui]'
+.venv/bin/evoforge workers list --root runs
+```
+
+Then reopen the existing experiment with `evoforge tui --output` pointing to its
+actual directory, using the same venv. No checkpoint migration or deletion of
+runs is needed. Native Konsole rendering still requires operator observation;
+the geometry and keyboard checks above use Textual's headless test driver.
