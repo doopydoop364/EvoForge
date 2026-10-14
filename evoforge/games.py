@@ -43,7 +43,7 @@ def make_env(game="snake", size=10, max_steps=300, game_config=None):
     return create(game, game_config, max_steps)
 
 def metric(env):
-    return int(getattr(env, "score", getattr(env, "food_eaten", 0)))
+    return float(getattr(env, "score", getattr(env, "food_eaten", 0)))
 
 def environment_fitness(env):
     if hasattr(env, "fitness"):

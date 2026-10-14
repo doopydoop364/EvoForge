@@ -1,3 +1,4 @@
+from .core.checkpoints import safe_load
 """Textual frontend. Imported only when the optional tui extra is installed."""
 import csv
 import json
@@ -331,7 +332,7 @@ class EvoForgeApp(App):
             else:
                 models=[]; config={}
             if snapshot.exists():
-                data = torch.load(snapshot,map_location="cpu",weights_only=False)
+                data = safe_load(snapshot)
                 snap_cfg=data.get("config",{})
                 if not config: config=snap_cfg
                 if all(snap_cfg.get(k,config.get(k)) == config.get(k) for k in ("game","size","hidden")):
@@ -597,7 +598,7 @@ class EvoForgeApp(App):
             self.notify_status("No checkpoint to extend");return
         try:
             import torch
-            data = torch.load(path,map_location="cpu",weights_only=False)
+            data = safe_load(path)
             cfg = dict(data["config"])
             cfg["generations"] = max(int(cfg["generations"]),int(data["generation"])) + 100
             (self.directory/"config.json").write_text(json.dumps(cfg,indent=2))

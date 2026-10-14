@@ -28,7 +28,10 @@ must be independently testable without FastAPI or Textual imports in the engine.
 1. SDK and policy factory: implemented. Installed external coin plugin;
    `.venv/bin/python -m pytest -q tests/test_sdk.py tests/test_games.py tests/test_core.py`: 13 passed.
    Discovery, validation, multidimensional observations, architecture rejection tested.
-2. Algorithms and checkpoint schema: pending.
+2. Algorithms/checkpoints: implemented; external evolution/PPO/hybrid and exact
+   PPO optimizer/RNG resume verified. Restricted legacy reader, checksums, atomic
+   commits, corrupt-primary fallback and metric reconciliation tested.
+   Stage checks: 30 passed (training v1, SDK, core, games, service, rewards).
 3. Persistent supervisor: pending.
 4. Live telemetry: pending.
 5. REST/WebSocket API: pending.

@@ -1,3 +1,4 @@
+from .core.checkpoints import safe_load
 """Optional graphical Snake champion spectator; rendering never drives training."""
 import argparse
 import time
@@ -9,13 +10,8 @@ from .snake import Snake
 
 
 def load_champion(path):
-    # Only open locally generated, trusted checkpoint files.
-    data = torch.load(path, map_location='cpu', weights_only=False)
-    cfg = data['config']
-    model = Policy(hidden=cfg['hidden'])
-    model.load_state_dict(data['state_dict'])
-    model.eval()
-    return model, cfg
+    from .agents.serialization import load_policy
+    return load_policy(path)
 
 
 def main(argv=None):
@@ -61,7 +57,7 @@ def main(argv=None):
             try:
                 stamp=sample_path.stat().st_mtime_ns
                 if stamp != sample_mtime:
-                    pack=torch.load(sample_path,map_location='cpu',weights_only=False)
+                    pack=safe_load(sample_path)
                     sample_cfg=pack['config']
                     new_samples=[]
                     for weights in pack['policies'][:9]:

@@ -1,3 +1,4 @@
+from .core.checkpoints import safe_load
 import argparse
 import json
 from pathlib import Path
@@ -60,7 +61,7 @@ def main():
                   'eval-episodes','size','max-steps','seed','hidden')})
         Trainer(cfg,args.output,resume=args.resume).run()
     elif args.command=='play':
-        data=torch.load(args.checkpoint,map_location='cpu',weights_only=False)
+        data=safe_load(args.checkpoint)
         cfg=data['config'];model=Policy(hidden=cfg['hidden']);model.load_state_dict(data['state_dict'])
         env=make_env(cfg.get('game','snake'),cfg['size'],cfg['max_steps']);obs=env.reset(args.seed);done=False
         while not done:

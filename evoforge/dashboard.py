@@ -1,3 +1,4 @@
+from .core.checkpoints import safe_load
 """Standard-library terminal UI; trainer runs in a separate child process."""
 import csv
 import curses
@@ -174,7 +175,7 @@ def _extend(screen, directory):
         return 'No checkpoint to extend; configure a new run first.'
     import torch
     try:
-        saved=torch.load(checkpoint,map_location='cpu',weights_only=False)
+        saved=safe_load(checkpoint)
         cfg=dict(saved['config'])
         current=max(int(cfg['generations']),int(saved['generation']))
         curses.echo();curses.curs_set(1);screen.nodelay(False)

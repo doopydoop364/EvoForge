@@ -1,3 +1,4 @@
+from .core.checkpoints import safe_load
 """SSH-friendly, curses-native Snake spectator. No SDL or display server required."""
 import time
 import curses
@@ -57,7 +58,7 @@ class TerminalInspector:
             model, config = load_champion(champion)
             models = [model]
             if spectator.is_file():
-                package = torch.load(spectator, map_location='cpu', weights_only=False)
+                package = safe_load(spectator)
                 if package.get('config', {}).get('size') == config['size'] and package.get('config', {}).get('game','snake') == config.get('game','snake'):
                     for weights in package.get('policies', [])[:9]:
                         other = Policy(hidden=config['hidden'])
