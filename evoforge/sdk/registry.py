@@ -34,6 +34,9 @@ def discover(refresh=False):
         return PLUGINS
     _discovered = True
     ERRORS.clear()
+    from evoforge.research.rps import RPS
+
+    register(RPS)
     for entry in entry_points(group="evoforge.games"):
         try:
             register(entry.load())

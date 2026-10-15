@@ -198,6 +198,9 @@ class RequestLimits:
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http" or scope["method"] not in {"POST", "PUT", "PATCH"}:
             return await self.app(scope, receive, send)
+        if scope["path"] == "/api/v1/research/backups/import" and scope["method"] == "POST":
+            # Authenticated endpoint streams into a bounded temporary file; never buffers a ZIP.
+            return await self.app(scope, receive, send)
         body = bytearray()
         while True:
             message = await receive()

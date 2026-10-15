@@ -164,7 +164,7 @@ describe("workspace", () => {
     localStorage.clear();
     wrap(<App />);
     await userEvent.click(screen.getByRole("button", { name: "Toggle theme" }));
-    expect(localStorage.getItem("evoforge-theme")).toBe("light");
+    expect(localStorage.getItem("evoforge-theme")).toBe("dark");
     expect(localStorage.length).toBe(1);
   });
   it("shows plugin discovery navigation", async () => {

@@ -140,7 +140,7 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   await expect(
     page.getByRole("button", { name: "Continue training", exact: true }),
   ).toBeVisible();
-  await nav(page, "Analytics");
+  await nav(page, "Compare Runs");
   await expect(page.locator(".chart").first()).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Population fitness" }),

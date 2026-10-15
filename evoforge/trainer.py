@@ -117,6 +117,9 @@ class Trainer:
         self.history = []
         self.lineage = []
         self.plugin_version = game_version(config.game)
+        from .research.provenance import manifest
+
+        self.research_manifest = manifest(config)
         if resume:
             self._load()
             self._sync_artifacts()
@@ -136,6 +139,7 @@ class Trainer:
                 "architecture": self.population[0].architecture,
                 "plugin_version": self.plugin_version,
                 "algorithm_version": 1,
+                "research_manifest": self.research_manifest,
                 "population": [m.state_dict() for m in self.population],
                 "optimizer_states": self.optimizer_states,
                 "champion": self.champion.state_dict() if self.champion else None,
@@ -168,6 +172,17 @@ class Trainer:
             raise ValueError("Checkpoint architecture incompatible with game/configuration")
         if len(data["population"]) != len(self.population):
             raise ValueError("Checkpoint population count does not match configuration")
+        recorded = data.get("research_manifest")
+        if recorded and recorded.get("environment") != self.research_manifest["environment"]:
+            raise ValueError(
+                "Environment content differs from checkpoint; restore the original environment"
+            )
+        if recorded:
+            self.research_manifest = recorded
+        else:
+            self.research_manifest["provenance"] = (
+                "Legacy checkpoint: original environment content was not recorded"
+            )
         self.generation = data["generation"]
         try:
             for model, state in zip(self.population, data["population"]):
@@ -241,9 +256,26 @@ class Trainer:
             },
             backup=False,
         )
+        self._sync_research()
         # Optional sink belongs to storage/supervisor; engine has no UI/API dependency.
         if getattr(self, "on_commit", None):
             self.on_commit(self)
+
+    def _sync_research(self):
+        from .research.store import ResearchStore
+
+        ResearchStore(self.dir).sync(
+            {
+                "config": asdict(self.cfg),
+                "generation": self.generation,
+                "architecture": self.population[0].architecture,
+                "population": [m.state_dict() for m in self.population],
+                "lineage": self.lineage,
+                "history": self.history,
+                "research_manifest": self.research_manifest,
+                "champion_history": self.champion_history,
+            }
+        )
 
     def _step(self, env, episode, reward, terminated, truncated):
         self.environment_steps += 1
@@ -291,6 +323,7 @@ class Trainer:
     def run(self):
         if not self.checkpoint.exists():
             self._save()
+            self._sync_research()
         self._worker_status("running")
         try:
             for g in range(self.generation, self.cfg.generations):
@@ -334,6 +367,9 @@ class Trainer:
                         next_population.append(improved)
                         optimizers.append(improved.optimizer_state)
                         ppo_stats.append(improved.training_stats)
+                        self.lineage.append(
+                            {"generation": g + 1, "agent": i, "parents": [i], "operation": "ppo"}
+                        )
                 else:
                     parents = [self.population[i] for i in order]
                     next_population = [parents[i].clone() for i in range(self.cfg.elites)]
