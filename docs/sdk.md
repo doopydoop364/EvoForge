@@ -42,3 +42,11 @@ deterministic seed handling, a configurable horizon, score fitness distinct from
 +1/-1 learning rewards, terminal text and a registered package entry point.
 Default policy widths `[64,64]` retain v0.9 state keys. Any positive list of MLP
 widths is supported; crossover requires identical architecture metadata.
+
+## Optional browser presentation
+
+GamePlugin now provides optional `render_scene()`, `render_terminal()` and
+classmethod `get_asset_manifest()` hooks. Legacy `render()` and `spectator_frame()`
+continue to work. See the [formal scene contract](render-scene.md),
+[asset packaging rules](asset-manifest.md), and `examples/coin-game` for a complete
+external package. Rendering never changes observations, action spaces or reward logic.

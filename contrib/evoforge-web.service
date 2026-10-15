@@ -1,0 +1,16 @@
+[Unit]
+Description=EvoForge web control center
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/EvoForge
+EnvironmentFile=%h/.config/evoforge/api.env
+Environment=EVOFORGE_WEB_DIR=%h/EvoForge/web/dist
+ExecStart=%h/EvoForge/.venv/bin/evoforge api serve --root %h/EvoForge/runs --host 127.0.0.1 --port 8765
+Restart=on-failure
+KillMode=process
+UMask=0077
+
+[Install]
+WantedBy=default.target

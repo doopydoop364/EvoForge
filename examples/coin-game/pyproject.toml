@@ -10,3 +10,6 @@ dependencies = ["evoforge>=1.0.0rc1"]
 coin = "coin_game:CoinGame"
 [tool.setuptools.packages.find]
 include = ["coin_game*"]
+
+[tool.setuptools.package-data]
+coin_game = ["assets/*.svg", "assets/*.txt"]

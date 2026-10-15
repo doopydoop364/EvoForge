@@ -27,6 +27,7 @@ def run_worker(root, experiment, identity, lock_fd):
     finish = threading.Event()
     failed = []
     trainer = None
+    publisher = None
 
     def signal_stop(*_):
         stop.set()
@@ -108,12 +109,13 @@ def run_worker(root, experiment, identity, lock_fd):
         cfg = Config(**json.loads((path / "config.json").read_text()))
         from evoforge.telemetry import TrainingPublisher
 
+        publisher = TrainingPublisher(path, cfg.game, identity)
         trainer = Trainer(
             cfg,
             path,
             resume=(path / "checkpoint.pt").exists(),
             control=control,
-            telemetry=TrainingPublisher(path, cfg.game, identity),
+            telemetry=publisher,
             managed=True,
         )
         trainer.on_commit = lambda current: database.sync_metrics(experiment, current.history)
@@ -139,6 +141,8 @@ def run_worker(root, experiment, identity, lock_fd):
                 (str(exc), experiment, identity),
             )
     finally:
+        if publisher:
+            publisher.close()
         finish.set()
         thread.join(timeout=6)
         with database.connect() as db:

@@ -1,6 +1,6 @@
 from typing import Any, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TrainingConfig(BaseModel):
@@ -21,6 +21,16 @@ class TrainingConfig(BaseModel):
     mutation_sigma: float = Field(0.08, ge=0, allow_inf_nan=False)
     game_config: dict[str, Any] = Field(default_factory=dict)
     environment_step_budget: int | None = Field(None, ge=1)
+
+    @field_validator("hidden")
+    @classmethod
+    def bounded_network(cls, value):
+        widths = [value] if isinstance(value, int) else value
+        if not 1 <= len(widths) <= 8 or any(
+            type(n) is not int or not 1 <= n <= 1024 for n in widths
+        ):
+            raise ValueError("Use 1–8 hidden layers, each between 1 and 1024 units")
+        return value
 
 
 class ExperimentCreate(BaseModel):

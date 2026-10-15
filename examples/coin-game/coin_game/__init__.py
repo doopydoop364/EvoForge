@@ -44,3 +44,46 @@ class CoinGame(GamePlugin):
 
     def render(self):
         return f"Coin: {self.target} | Score: {self.score} | Step: {self.step_count}/{self.horizon}"
+
+    @classmethod
+    def get_asset_manifest(cls):
+        return {
+            "protocol": 1,
+            "assets": {
+                name: {"path": f"assets/{name}.svg", "media_type": "image/svg+xml"}
+                for name in ("background", "player", "coin")
+            },
+        }
+
+    def render_scene(self):
+        from evoforge.rendering.builtin import sprite
+
+        return {
+            "protocol": 1,
+            "width": 480,
+            "height": 320,
+            "nodes": [
+                sprite("background", "background", 0, 0, 480, 320, layer=-1),
+                sprite("player", "player", 70 + self.target * 220, 180, 64, 64),
+                sprite("coin", "coin", 82 + self.target * 220, 100, 40, 40, animation="shine"),
+                {
+                    "id": "score",
+                    "kind": "text",
+                    "text": f"{self.score} CORRECT · {self.step_count}/{self.horizon}",
+                    "x": 24,
+                    "y": 24,
+                    "hud": True,
+                },
+                {
+                    "id": "target",
+                    "kind": "text",
+                    "text": f"NEXT TARGET: {self.target}",
+                    "x": 24,
+                    "y": 60,
+                    "font_size": 16,
+                    "color": "#bdd9c7",
+                    "hud": True,
+                },
+            ],
+            "animations": {"shine": {"frames": ["coin"], "fps": 4}},
+        }

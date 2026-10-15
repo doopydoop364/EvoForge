@@ -48,3 +48,27 @@ are restricted slugs below a fixed server-owned root. The API is a privileged
 single-operator service, not a multi-tenant sandbox. Installed game plugins run
 with the operator account's privileges. Keep token, root and plugin installation
 under the same trusted operator control. API docs reveal schemas but no run data.
+
+## Browser API extensions
+
+All HTTP endpoints below retain existing Bearer authentication and additionally
+accept the authenticated browser session cookie. See [browser security](web-security.md).
+
+| Method | `/api/v1` path | Result |
+|---|---|---|
+| POST / DELETE | `/session` | Establish / clear HttpOnly browser session |
+| GET | `/health` | Authenticated health and renderer version |
+| GET | `/dashboard` | Actual metrics, resources, recent events and warnings |
+| GET | `/games/{game}/manifest` | Validated, content-versioned asset URLs |
+| GET | `/games/{game}/assets/{digest}/{id}` | Allowlisted authenticated asset bytes |
+| GET | `/games/{game}/scene?seed=42` | Independent initial scene; does not advance training |
+| GET | `/experiments/{id}/checkpoints` | Names, sizes and modification times of fixed artifacts |
+| GET | `/experiments/{id}/logs` | Latest 64 KiB of the fixed worker log |
+| GET / POST | `/experiments/{id}/replays` | Browse recordings / generate bounded policy replay |
+| GET | `/experiments/{id}/replays/{recording}?offset=0&limit=256` | Metadata and ordered frame page |
+
+Replay POST body: `{"mode":"champion","seed":900,"limit":1}` (population limit
+1–9). Existing spectator and event WebSockets accept the session cookie, retain
+Bearer support, validate browser Origin, and preserve `since`, `cursor`, `gap` and
+sequence semantics. Scene data is additive under a sampled frame's `data.scene`;
+existing `data.text` continues to work. No old endpoint was removed.

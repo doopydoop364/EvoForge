@@ -50,6 +50,7 @@ def evaluate_details(
     try:
         for episode, seed in enumerate(seeds):
             obs = env.reset(seed=int(seed))
+            env.episode_seed = int(seed)
             done, total_reward = False, 0.0
             while not done:
                 obs, reward, terminated, truncated, info = transition(

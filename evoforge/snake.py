@@ -121,6 +121,20 @@ class Snake:
         reward = (2.0 if ate else -0.002) + (3.0 if self.food is None else 0.0)
         return self.observe(), reward, self.done, {"food": self.food_eaten, "steps": self.steps}
 
+    def render_scene(self):
+        from .rendering.builtin import scene
+
+        return scene(self, "snake")
+
+    def render_terminal(self):
+        return self.render()
+
+    @classmethod
+    def get_asset_manifest(cls):
+        from .rendering.builtin import manifest
+
+        return manifest("snake")
+
     def render(self):
         occupied = set(self.body)
         return "\n".join(

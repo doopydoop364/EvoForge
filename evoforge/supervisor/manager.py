@@ -49,6 +49,8 @@ class Supervisor:
             raise WorkerConflict("Experiment already exists") from exc
         atomic_json(path / "config.json", asdict(cfg))
         self.register(experiment)
+        with self.database.connect() as db:
+            self.database.event(db, experiment, "created", {})
         return self.inspect(experiment)
 
     def register(self, experiment):
@@ -266,6 +268,9 @@ class Supervisor:
             source.rename(target)
             try:
                 with self.database.connect() as db:
+                    # Deferral must belong to an explicit transaction. An implicit
+                    # BEGIN can reset it before updating a referenced experiment.
+                    db.execute("BEGIN IMMEDIATE")
                     db.execute("PRAGMA defer_foreign_keys=ON")
                     db.execute("UPDATE experiments SET id=? WHERE id=?", (destination, experiment))
                     for table in ("workers", "metrics", "events"):

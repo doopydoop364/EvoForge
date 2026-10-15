@@ -69,6 +69,9 @@ class TrainingPublisher:
         self.sample_interval = sample_interval
         self.episodes = weakref.WeakKeyDictionary()
         self.dropped = 0
+        from .recordings import EpisodeRecorder
+
+        self.recorder = EpisodeRecorder(directory, game)
 
     def __call__(self, env, episode, reward, terminated, truncated, generation, agent, phase):
         # Sample evaluation frames; PPO rollouts are not spectator episodes.
@@ -90,6 +93,7 @@ class TrainingPublisher:
             "episode_index": episode,
             "timestamp": time.time(),
             "step": env.steps,
+            "seed": getattr(env, "episode_seed", None),
             "score": metric(env),
             "reward": float(reward),
             "terminated": bool(terminated),
@@ -98,5 +102,9 @@ class TrainingPublisher:
             "data": frame(env),
             "dropped": self.dropped,
         }
+        self.recorder.submit(payload)
         if not self.channel.publish(payload):
             self.dropped += 1
+
+    def close(self):
+        self.recorder.close()
