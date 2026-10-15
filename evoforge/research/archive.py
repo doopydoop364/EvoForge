@@ -169,6 +169,40 @@ def validate_archive(path, destination=None):
         raise ValueError(f"Invalid backup: {exc}") from exc
 
 
+def parameter_layout(architecture):
+    """Validate dimensions without allocating a model from untrusted metadata."""
+    if not isinstance(architecture, dict) or set(architecture) != {
+        "input_size",
+        "hidden",
+        "actions",
+    }:
+        raise ValueError("Invalid policy architecture")
+    widths = architecture["hidden"]
+    if not isinstance(widths, list) or not 1 <= len(widths) <= 8:
+        raise ValueError("Invalid hidden-layer layout")
+    dimensions = [architecture["input_size"], architecture["actions"], *widths]
+    if any(type(n) is not int or not 1 <= n <= 65536 for n in dimensions):
+        raise ValueError("Invalid policy dimensions")
+    expected, previous = {}, architecture["input_size"]
+    for i, width in enumerate(widths):
+        expected[f"encoder.{i * 2}.weight"] = [width, previous]
+        expected[f"encoder.{i * 2}.bias"] = [width]
+        previous = width
+    expected.update(
+        {
+            "actor.weight": [architecture["actions"], previous],
+            "actor.bias": [architecture["actions"]],
+            "critic.weight": [1, previous],
+            "critic.bias": [1],
+        }
+    )
+    import math
+
+    if sum(math.prod(shape) for shape in expected.values()) > 8_000_000:
+        raise ValueError("Policy exceeds backup validation resource limit")
+    return expected
+
+
 def validate_artifacts(directory):
     from evoforge.api.schemas import TrainingConfig
     from evoforge.telemetry.recordings import Recording
@@ -191,19 +225,7 @@ def validate_artifacts(directory):
         architecture = data.get("architecture")
         if not isinstance(architecture, dict):
             raise ValueError(f"{name}: architecture is required")
-        dims = [
-            architecture.get("input_size", 0),
-            architecture.get("actions", 0),
-            *architecture.get("hidden", []),
-        ]
-        if (
-            not dims
-            or any(type(n) is not int or n < 1 or n > 65536 for n in dims)
-            or len(dims) > 10
-        ):
-            raise ValueError("Invalid policy dimensions")
-        if sum(a * b for a, b in zip(dims[:1] + dims[2:], dims[2:] + dims[1:2])) > 8_000_000:
-            raise ValueError("Policy exceeds backup validation resource limit")
+        parameter_layout(architecture)
         with torch.random.fork_rng():
             model = Policy(**architecture)
         states = data.get("population", data.get("policies", [data.get("state_dict")]))
@@ -242,6 +264,8 @@ def validate_artifacts(directory):
                 if not all(torch.isfinite(value).all() for value in state.values()):
                     raise ValueError("Non-finite model parameters")
                 model.load_state_dict(state, strict=True)
+                if not all(torch.isfinite(value).all() for value in model.state_dict().values()):
+                    raise ValueError("Non-finite parameters after policy dtype conversion")
             except (RuntimeError, AttributeError, TypeError) as exc:
                 raise ValueError(f"Invalid checkpoint parameters: {exc}") from exc
     research = directory / "research.sqlite"
@@ -294,6 +318,7 @@ def validate_artifacts(directory):
                 if len(raw) % 4 or not np.isfinite(np.frombuffer(raw, dtype="<f4")).all():
                     raise ValueError("Invalid research parameters")
                 structure = json.loads(descriptor)
+                expected_layout = parameter_layout(structure.get("architecture"))
                 parts = structure.get("layout", [])
                 offset = 0
                 names = set()
@@ -311,6 +336,8 @@ def validate_artifacts(directory):
                         raise ValueError("Invalid research parameter layout")
                     names.add(part["name"])
                     offset += part["count"]
+                if {part["name"]: part["shape"] for part in parts} != expected_layout:
+                    raise ValueError("Research weights do not match their policy architecture")
                 if offset * 4 != len(raw):
                     raise ValueError("Research parameter length mismatch")
     for replay in (directory / "replays").glob("*.json"):
@@ -330,7 +357,21 @@ def restore_backup(manager, identifier, destination):
         # Validate the installed environment before publishing any new experiment.
         from evoforge.trainer import Config
 
-        Config(**json.loads((staging / "config.json").read_text())).validate()
+        config = Config(**json.loads((staging / "config.json").read_text()))
+        config.validate()
+        from evoforge.agents.factory import policy_for
+
+        with torch.random.fork_rng():
+            expected = policy_for(
+                config.game, config.hidden, config.game_config, config.size, config.max_steps
+            ).architecture
+        for artifact in ("checkpoint.pt", "champion.pt", "spectator.pt"):
+            if (staging / artifact).exists():
+                data = safe_load(staging / artifact, max_bytes=MAX_BYTES)
+                if data.get("architecture") != expected:
+                    raise ValueError(
+                        "Checkpoint architecture differs from the configured environment or network"
+                    )
         # Reserve target atomically. Never replace an existing run, even in a race.
         target.mkdir()
         try:

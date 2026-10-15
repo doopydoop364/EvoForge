@@ -395,3 +395,51 @@ def test_loader_rejects_old_torch_runtime(tmp_path, monkeypatch):
     monkeypatch.setattr(torch, "__version__", "2.9.1+cpu")
     with pytest.raises(ValueError, match="PyTorch 2.10"):
         safe_load(tmp_path / "any.pt")
+
+
+def test_restore_checks_installed_architecture_before_publication(tmp_path):
+    from evoforge.policy import Policy
+
+    manager = trained(tmp_path, generations=1)
+    path = manager.path("alpha") / "checkpoint.pt"
+    data = safe_load(path)
+    model = Policy(input_size=9, hidden=6, actions=3)
+    data.update(architecture=model.architecture, population=[model.state_dict()] * 3, champion=None)
+    save(path, data, backup=False)
+    backup = create_backup(manager, "alpha")
+    with pytest.raises(ValueError, match="configured environment or network"):
+        restore_backup(manager, backup["id"], "incompatible")
+    assert not manager.path("incompatible").exists()
+
+
+def test_backup_rejects_finite_values_that_overflow_policy_dtype(tmp_path):
+    from evoforge.research.archive import validate_artifacts
+
+    manager = trained(tmp_path, generations=1)
+    path = manager.path("alpha") / "checkpoint.pt"
+    data = safe_load(path)
+    name = next(iter(data["population"][0]))
+    values = data["population"][0][name].double()
+    values.flatten()[0] = 1e300
+    data["population"][0][name] = values
+    save(path, data, backup=False)
+    with pytest.raises(ValueError, match="dtype conversion"):
+        validate_artifacts(manager.path("alpha"))
+
+
+def test_backup_checks_research_architecture_without_allocating(tmp_path):
+    from evoforge.research.archive import validate_artifacts
+
+    manager = trained(tmp_path, generations=1)
+    store = ResearchStore(manager.path("alpha"))
+    with store.connect() as db:
+        row = db.execute("SELECT descriptor,weights FROM nodes WHERE id='1:0'").fetchone()
+        descriptor = json.loads(row["descriptor"])
+        descriptor["architecture"]["hidden"] = [1000000000]
+        encoded = json.dumps(descriptor)
+        fingerprint = hashlib.sha256(encoded.encode() + b"\0" + row["weights"]).hexdigest()
+        db.execute(
+            "UPDATE nodes SET descriptor=?,fingerprint=? WHERE id='1:0'", (encoded, fingerprint)
+        )
+    with pytest.raises(ValueError, match="policy dimensions"):
+        validate_artifacts(manager.path("alpha"))
