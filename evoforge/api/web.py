@@ -25,6 +25,8 @@ class ReplayRequest(Model):
 
 def install_routes(router, manager):
     replay_lock = threading.Lock()
+    cpu_lock = threading.Lock()
+    cpu_previous = None
 
     @router.get("/api/v1/health")
     def health():
@@ -32,6 +34,7 @@ def install_routes(router, manager):
 
     @router.get("/api/v1/dashboard")
     def dashboard():
+        nonlocal cpu_previous
         from evoforge.supervisor.lifecycle import ACTIVE
 
         runs = manager.list()
@@ -41,6 +44,7 @@ def install_routes(router, manager):
             latest[run["id"]] = history[-1] if history else None
         resources = {
             "cpu_count": os.cpu_count(),
+            "cpu_percent": None,
             "load_average": None,
             "memory_used_bytes": None,
             "memory_total_bytes": None,
@@ -55,6 +59,26 @@ def install_routes(router, manager):
             resources["memory_total_bytes"] = memory["MemTotal"]
             resources["memory_used_bytes"] = memory["MemTotal"] - memory["MemAvailable"]
         except (OSError, AttributeError, KeyError, ValueError):
+            pass
+        try:
+            with cpu_lock:
+                ticks = [
+                    int(n) for n in Path("/proc/stat").read_text().splitlines()[0].split()[1:9]
+                ]
+                total, idle = sum(ticks), ticks[3] + ticks[4]
+                if cpu_previous and total > cpu_previous[0]:
+                    resources["cpu_percent"] = round(
+                        max(
+                            0,
+                            min(
+                                100,
+                                100 * (1 - (idle - cpu_previous[1]) / (total - cpu_previous[0])),
+                            ),
+                        ),
+                        1,
+                    )
+                cpu_previous = (total, idle)
+        except (OSError, ValueError, IndexError):
             pass
         import torch
 

@@ -126,6 +126,7 @@ export type DashboardData = {
   latest: Record<string, Metric | null>;
   resources: {
     cpu_count: number;
+    cpu_percent?: number | null;
     load_average: number[] | null;
     memory_used_bytes: number | null;
     memory_total_bytes: number | null;

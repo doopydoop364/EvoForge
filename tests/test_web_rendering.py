@@ -297,3 +297,18 @@ def test_saved_spectator_frames_follow_renamed_run(tmp_path):
             assert frame["experiment"] == "after"
             assert frame["recorded_experiment"] == "before"
             assert frame["data"]["text"] == "recorded"
+
+
+def test_dashboard_cpu_usage_is_measured_from_successive_samples(tmp_path, monkeypatch):
+    from pathlib import Path
+
+    original = Path.read_text
+    samples = iter(["cpu  100 0 0 100 0 0 0 0 0 0\n", "cpu  130 0 0 110 0 0 0 0 0 0\n"])
+
+    def read(path, *args, **kwargs):
+        return next(samples) if str(path) == "/proc/stat" else original(path, *args, **kwargs)
+
+    monkeypatch.setattr(Path, "read_text", read)
+    with TestClient(create_app(tmp_path)) as client:
+        assert client.get("/api/v1/dashboard").json()["resources"]["cpu_percent"] is None
+        assert client.get("/api/v1/dashboard").json()["resources"]["cpu_percent"] == 75.0

@@ -75,7 +75,8 @@ Tests do not touch `./runs`. Do not weaken assertions or remove required checks.
 ## Interface behavior
 
 Empty, unavailable and failed data are labeled. Historical resource utilization
-is not collected, so the dashboard shows a current host load/memory snapshot; CPU
+is not collected, so the dashboard shows a current host CPU/load/memory snapshot. Linux CPU utilization is calculated
+from successive `/proc/stat` samples without a blocking measurement; CPU
 load is not presented as a utilization percentage. CUDA availability is reported
 without assuming compatible kernels. PPO charts appear only for measured PPO
 refinements. Comparisons retain per-run game/version, seed and budget metadata;

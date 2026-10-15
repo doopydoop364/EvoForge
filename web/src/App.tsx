@@ -578,6 +578,14 @@ export default function App() {
                           }
                         />
                         <div className="resource">
+                          <span>CPU utilization</span>
+                          <b>
+                            {dashboard.data?.resources.cpu_percent == null
+                              ? "Awaiting sample"
+                              : `${fmt(dashboard.data.resources.cpu_percent)}%`}
+                          </b>
+                        </div>
+                        <div className="resource">
                           <span>CPU load (1 minute)</span>
                           <b>
                             {String(
