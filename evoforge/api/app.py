@@ -294,6 +294,12 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
                             else []
                         )
                     )
+                    # A rename moves the persisted ring intact. Route identity is
+                    # authoritative; retain the original name as provenance.
+                    frames = [
+                        {**f, "recorded_experiment": f.get("experiment"), "experiment": experiment}
+                        for f in frames
+                    ]
                     key = "frames"
                 else:
                     frames = await asyncio.to_thread(manager.database.events, cursor)

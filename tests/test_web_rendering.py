@@ -278,3 +278,22 @@ def test_websocket_cookie_origin_rejection_and_remote_binding(tmp_path, monkeypa
     monkeypatch.setenv("EVOFORGE_ALLOWED_HOSTS", "*")
     with pytest.raises(ValueError, match="Wildcard"):
         create_app(tmp_path)
+
+
+def test_saved_spectator_frames_follow_renamed_run(tmp_path):
+    from evoforge.telemetry import FrameChannel
+
+    app = create_app(tmp_path)
+    manager = app.state.supervisor
+    manager.create("before", {})
+    channel = FrameChannel(tmp_path / "before")
+    assert channel.publish(
+        {"experiment": "before", "agent": "0", "timestamp": 1.0, "data": {"text": "recorded"}}
+    )
+    manager.rename("before", "after")
+    with TestClient(app) as client:
+        with client.websocket_connect("/api/v1/experiments/after/spectator") as ws:
+            frame = ws.receive_json()["frames"][0]
+            assert frame["experiment"] == "after"
+            assert frame["recorded_experiment"] == "before"
+            assert frame["data"]["text"] == "recorded"
