@@ -4,3 +4,10 @@ recursive-include contrib *.service
 recursive-include examples *.py *.toml
 recursive-exclude examples *.pyc
 prune examples/coin-game/evoforge_example_coin.egg-info
+recursive-include contrib *.conf
+recursive-include examples *.svg *.txt
+recursive-include web *.json *.ts *.tsx *.css *.js *.html
+prune web/node_modules
+prune web/dist
+prune web/test-results
+prune web/playwright-report

@@ -30,3 +30,13 @@ rewards must not be modified just to improve benchmark scores.
 Report exact commands, outcomes, limitations and unresolved acceptance gates in
 PROGRESS and RELEASE documentation. Keep version 1.0.0rc1 until final operator
 acceptance; stable tags, merges and releases require explicit authorization.
+
+## Web changes
+
+Follow [web development](docs/web-development.md) and run all Python/Textual,
+frontend unit/type/lint/build and real-backend Playwright gates. The rendering,
+asset and replay specifications live in `docs/`. Use the Coin example to verify a
+plugin without game-specific React changes. Keep scene generation outside unsampled
+simulation steps; bound queues, files and JSON. Never commit tokens, run data,
+node_modules, screenshots or generated test storage. Preserve the backend version
+unless a separate release decision authorizes changing it.

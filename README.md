@@ -77,3 +77,24 @@ when upgrading; see [migration](docs/training.md#checkpoint-schema-1).
 - [Contributing and testing](CONTRIBUTING.md)
 - [Release readiness and unverified scenarios](docs/RELEASE.md)
 - [Audit and incremental implementation progress](docs/PROGRESS.md)
+
+## Browser control center (Web 0.1)
+
+EvoForge now includes a responsive React control center for experiment lifecycle,
+worker controls, measured analytics, plugin discovery and a generic PixiJS spectator.
+Snake, Flappy and the installed Coin example provide original visual assets.
+Sampled episodes are recorded for later playback; champion and population replay
+run independently from training. The Textual application remains supported.
+
+```sh
+.venv/bin/python -m pip install -e '.[api,tui]' -e ./examples/coin-game
+npm --prefix web ci
+npm --prefix web run build
+.venv/bin/evoforge api serve --root ./runs --host 127.0.0.1 --port 8765
+```
+
+Open http://127.0.0.1:8765. For a fresh machine, follow the full
+[web development setup](docs/web-development.md). See [production and LAN/SSH access](docs/web-deployment.md),
+[security](docs/web-security.md), [render scenes](docs/render-scene.md),
+[asset manifests](docs/asset-manifest.md), [replay format](docs/replay-format.md), and
+[troubleshooting](docs/web-troubleshooting.md). No public tunnel or automatic deployment is required.

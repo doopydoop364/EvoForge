@@ -87,3 +87,9 @@ runs root used previously. The commands work in fish without activation. No
 experiment migration, reset or deletion is needed for this fix. This branch is
 a review build, not a merged release. After the PR is approved and merged, use
 `feature/v1.0-universal-core` instead of the bugfix branch in the commands above.
+
+## Web interface
+
+See [web development](web-development.md) for Node/Python setup and
+[deployment](web-deployment.md) for production, CachyOS/fish and secure access from
+another machine. Install the optional Coin package to expose that example in the UI.
