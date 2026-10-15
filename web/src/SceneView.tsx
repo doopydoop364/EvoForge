@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Application,
   Assets,
@@ -11,6 +11,7 @@ import {
 import { useQuery } from "@tanstack/react-query";
 import { api } from "./api";
 import type { Scene, Node } from "./types";
+import { capturedScene } from "./capturedScene";
 
 export function SceneView({
   scene,
@@ -26,9 +27,14 @@ export function SceneView({
   fps?: number;
 }) {
   const host = useRef<HTMLDivElement>(null);
+  const presentation = useMemo(
+    () => scene ?? capturedScene(game, text),
+    [scene, game, text],
+  );
   const [error, setError] = useState("");
-  const latest = useRef({ scene, zoom, fps });
-  latest.current = { scene, zoom, fps };
+  const [assetError, setAssetError] = useState("");
+  const latest = useRef({ scene: presentation, zoom, fps });
+  latest.current = { scene: presentation, zoom, fps };
   const manifest = useQuery({
     queryKey: ["manifest", game],
     queryFn: () => api.manifest(game),
@@ -51,6 +57,7 @@ export function SceneView({
     hud.sortableChildren = true;
     const reduced = matchMedia("(prefers-reduced-motion: reduce)").matches;
     setError("");
+    setAssetError("");
     async function init() {
       try {
         await app.init({
@@ -78,10 +85,26 @@ export function SceneView({
                 url.origin !== location.origin ||
                 !url.pathname.startsWith("/api/v1/games/")
               )
-                return;
-              textures.set(id, await Assets.load<Texture>(url.href));
+                throw Error("Asset URL must use the local game API");
+              // The content-addressed API URLs have no file extension.
+              const parser =
+                asset.media_type === "image/svg+xml"
+                  ? "svg"
+                  : ["image/png", "image/webp"].includes(asset.media_type)
+                    ? "texture"
+                    : null;
+              if (!parser) return;
+              const texture = await Assets.load<Texture>({
+                src: url.href,
+                parser,
+              });
+              if (!texture) throw Error("No texture returned");
+              textures.set(id, texture);
             } catch {
-              /* Missing assets use visible placeholders. */
+              if (!stopped)
+                setAssetError(
+                  "Some game graphics could not be loaded. Showing placeholders and the captured text below.",
+                );
             }
           }),
         );
@@ -234,12 +257,23 @@ export function SceneView({
   return (
     <div className="scene-wrap">
       <div ref={host} className="scene-canvas" data-testid="scene-canvas" />
-      {(!scene || error || manifest.isError) && (
+      {assetError && (
+        <p role="alert" className="scene-warning">
+          {assetError}
+        </p>
+      )}
+      {(!presentation || error || manifest.isError) && (
         <pre className="scene-fallback">
           {error ? "Graphics unavailable. " : ""}
           {manifest.isError ? "Assets unavailable. " : ""}
           {text || "Waiting for gameplay frames…"}
         </pre>
+      )}
+      {!scene && presentation && (
+        <p className="scene-caption">Rendered from captured board text.</p>
+      )}
+      {assetError && presentation && !error && (
+        <pre>{text || "Captured text is unavailable."}</pre>
       )}
     </div>
   );

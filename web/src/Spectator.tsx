@@ -10,6 +10,7 @@ import { api } from "./api";
 import { SceneView } from "./SceneView";
 import { useSpectator } from "./stream";
 import type { Experiment, Frame, Recording } from "./types";
+import { Timestamp } from "./Timestamp";
 function ReplayCard({
   record,
   game,
@@ -163,6 +164,16 @@ export function Spectator({ run }: { run?: Experiment }) {
         (!focused || focused === f.agent),
     )
     .slice(0, count);
+  const training = run.status === "RUNNING";
+  const newest = Math.max(0, ...live.frames.map((f) => f.timestamp));
+  const stale = newest > 0 && Date.now() / 1000 - newest > 15;
+  const liveLabel = !training
+    ? "Saved frames"
+    : stale
+      ? "Waiting for fresh frames"
+      : live.frames.length
+        ? "Live sampled frames"
+        : "Waiting for frames";
   return (
     <>
       <section className="panel">
@@ -172,7 +183,7 @@ export function Spectator({ run }: { run?: Experiment }) {
             <h2>A window into the learning process.</h2>
           </div>
           <span className="badge">
-            {mode === "live" ? live.status : "Replay"}
+            {mode === "live" ? liveLabel : "Replay"}
           </span>
         </div>
         <div className="toolbar">
@@ -187,7 +198,9 @@ export function Spectator({ run }: { run?: Experiment }) {
                 setFocused("");
               }}
             >
-              <option value="live">Live Training</option>
+              <option value="live">
+                {training ? "Live Training" : "Last Training Frames"}
+              </option>
               <option value="champion">Champion Replay</option>
               <option value="population">Population Replay</option>
               <option value="recorded">Recorded Episodes</option>
@@ -273,6 +286,47 @@ export function Spectator({ run }: { run?: Experiment }) {
             )
           )}
         </div>
+        {mode === "live" && (
+          <p className="muted">
+            Telemetry connection: {live.status}.{" "}
+            {training
+              ? "Training is running; frames are sampled."
+              : "No live training is running for this experiment. These are the last saved samples."}
+          </p>
+        )}
+        {mode === "live" && (!training || stale) && (
+          <div className="notice spectator-notice">
+            <p>
+              {newest > 0 && (
+                <>
+                  Last captured frame: <Timestamp value={newest} />.{" "}
+                </>
+              )}
+              Watch a saved episode or generate a separate champion replay to
+              see playback.
+            </p>
+            <div className="toolbar">
+              <button
+                onClick={() => {
+                  setMode("recorded");
+                  setKeys([]);
+                  setFocused("");
+                }}
+              >
+                Browse saved episodes
+              </button>
+              <button
+                onClick={() => {
+                  setMode("champion");
+                  setKeys([]);
+                  setFocused("");
+                }}
+              >
+                Open champion replay
+              </button>
+            </div>
+          </div>
+        )}
         {generation.error && (
           <p role="alert" className="error">
             {generation.error.message}
@@ -325,9 +379,10 @@ export function Spectator({ run }: { run?: Experiment }) {
                   </span>
                 </div>
                 <p className="muted">
-                  {new Date(f.timestamp * 1000).toLocaleTimeString()} · step{" "}
-                  {f.step} · {run.status === "RUNNING" ? "sampled" : "saved"}{" "}
-                  frame #{f.seq}
+                  <Timestamp value={f.timestamp} /> · step {f.step} ·{" "}
+                  {run.status === "RUNNING" ? "sampled" : "saved"} frame #
+                  {f.seq}
+                  {f.terminated || f.truncated ? " · Episode ended" : ""}
                 </p>
                 {f.data.render_error && (
                   <p role="alert">{f.data.render_error}</p>
@@ -336,8 +391,9 @@ export function Spectator({ run }: { run?: Experiment }) {
             ))
           ) : (
             <div className="empty panel">
-              Waiting for sampled gameplay. Start a worker to receive actual
-              frames.
+              {training
+                ? "Waiting for sampled gameplay from the running worker."
+                : "No saved training frames are available for this experiment. Browse recordings or open a champion replay."}
             </div>
           )}
         </div>
@@ -357,7 +413,7 @@ export function Spectator({ run }: { run?: Experiment }) {
                 {list.data?.map((r) => (
                   <option value={r.id} key={r.id}>
                     {r.source} · agent {r.agent} · score {r.score} ·{" "}
-                    {new Date(r.created * 1000).toLocaleTimeString()}
+                    {new Date(r.created * 1000).toLocaleString()}
                   </option>
                 ))}
               </select>

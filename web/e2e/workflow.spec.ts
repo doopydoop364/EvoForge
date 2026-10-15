@@ -25,7 +25,27 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   page,
   browser,
 }) => {
+  const renderWarnings: string[] = [];
+  const loadedAssets = new Set<string>();
+  page.on("console", (message) => {
+    if (
+      /could not be loaded|Failed to load|specified load parser/.test(
+        message.text(),
+      )
+    )
+      renderWarnings.push(message.text());
+  });
+  page.on("response", (response) => {
+    if (
+      response.url().includes("/api/v1/games/") &&
+      response.url().includes("/assets/") &&
+      response.ok()
+    )
+      loadedAssets.add(response.url());
+  });
   await login(page);
+  // The initial unauthenticated health check correctly returns 401.
+  renderWarnings.length = 0;
   await nav(page, "Games & Plugins");
   await expect(
     page.getByRole("heading", { name: "Coin prediction" }),
@@ -37,6 +57,15 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
     page.getByRole("heading", { name: "Flappy-style" }),
   ).toBeVisible();
   await expect(page.locator("canvas")).toHaveCount(3);
+  // A canvas alone also passes when every sprite is a placeholder. Verify the
+  // extensionless assets actually reached the image loaders for all plugins.
+  await expect.poll(() => loadedAssets.size).toBe(12);
+  expect(renderWarnings).toEqual([]);
+  await expect(page.locator(".scene-warning")).toHaveCount(0);
+  await page.screenshot({
+    path: "test-results/game-previews.png",
+    fullPage: true,
+  });
   await page
     .getByRole("button", { name: "New experiment", exact: true })
     .click();
@@ -89,7 +118,7 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   ).toBeVisible();
   await action(page, "Stop");
   await expect(
-    page.getByRole("button", { name: "Start", exact: true }),
+    page.getByRole("button", { name: "Continue training", exact: true }),
   ).toBeVisible();
   await nav(page, "Analytics");
   await expect(page.locator(".chart").first()).toBeVisible();
@@ -117,6 +146,8 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
     .getByLabel("Open experiment", { exact: true })
     .selectOption("browser-coin");
   await nav(page, "Spectator");
+  await expect(page.getByText("Saved frames", { exact: true })).toBeVisible();
+  await expect(page.getByText(/No live training is running/)).toBeVisible();
   await page.getByLabel("Mode", { exact: true }).selectOption("recorded");
   const options = page.getByLabel("Saved episode").locator("option");
   await expect.poll(() => options.count()).toBeGreaterThan(1);
@@ -171,4 +202,99 @@ test("mobile layout, theme persistence, missing credentials, and secure sessions
     path: "test-results/dashboard-mobile.png",
     fullPage: true,
   });
+});
+
+test("completed runs require an extension and continue from their checkpoint", async ({
+  page,
+}) => {
+  await login(page);
+  const response = await page.request.post("/api/v1/experiments", {
+    data: {
+      id: "completed-test",
+      config: {
+        game: "coin",
+        mode: "evolution",
+        generations: 2,
+        population: 4,
+        elites: 1,
+        ppo_candidates: 0,
+        eval_episodes: 1,
+        hidden: [8],
+        game_config: { horizon: 4 },
+      },
+    },
+  });
+  expect(response.ok()).toBe(true);
+  await page.reload();
+  await page
+    .getByLabel("Open experiment", { exact: true })
+    .selectOption("completed-test");
+  await nav(page, "Experiments");
+  await action(page, "Start");
+  const continueButton = page.getByRole("button", {
+    name: "Continue training",
+    exact: true,
+  });
+  await expect(continueButton).toBeDisabled();
+  await expect(page.getByText(/Generation limit reached/)).toBeVisible();
+  await page
+    .getByRole("button", { name: "Extend training", exact: true })
+    .click();
+  await page.getByLabel("Additional generations").fill("3");
+  await page
+    .getByRole("button", { name: "Confirm extend", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(continueButton).toBeEnabled();
+  await continueButton.click();
+  await expect(page.getByRole("dialog")).toContainText(
+    "from its latest checkpoint up to 5 generations",
+  );
+  await page
+    .getByRole("button", { name: "Confirm start", exact: true })
+    .click();
+  await expect(page.getByRole("dialog")).not.toBeVisible();
+  await expect(continueButton).toBeDisabled();
+  const metrics = await page.request.get(
+    "/api/v1/experiments/completed-test/metrics",
+  );
+  expect(
+    (await metrics.json()).map((row: { generation: number }) => row.generation),
+  ).toEqual([0, 1, 2, 3, 4]);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole("button", { name: "Toggle navigation" }).click();
+  await nav(page, "Spectator");
+  await expect(
+    page.getByRole("button", { name: "Open champion replay" }),
+  ).toBeVisible();
+  expect(
+    await page.evaluate(
+      () => document.documentElement.scrollWidth <= innerWidth,
+    ),
+  ).toBe(true);
+  await page.screenshot({
+    path: "test-results/spectator-mobile.png",
+    fullPage: true,
+  });
+});
+
+test("failed game assets produce a visible warning and captured text", async ({
+  page,
+}) => {
+  await login(page);
+  await page.route("**/api/v1/games/snake/assets/**", (route) =>
+    route.fulfill({
+      status: 200,
+      contentType: "image/svg+xml",
+      body: "invalid svg",
+    }),
+  );
+  await nav(page, "Games & Plugins");
+  const snake = page
+    .locator(".game-card")
+    .filter({ has: page.getByRole("heading", { name: "Snake", exact: true }) });
+  await expect(snake.getByRole("alert")).toContainText(
+    "Some game graphics could not be loaded",
+  );
+  await expect(snake.locator("pre")).toContainText("H");
 });

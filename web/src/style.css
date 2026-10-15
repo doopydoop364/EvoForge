@@ -757,6 +757,44 @@ pre {
 .log-view {
   min-height: 300px;
 }
+.log-entries {
+  max-height: 560px;
+  overflow: auto;
+  margin: 16px 0;
+}
+.log-entry {
+  border-bottom: 1px solid var(--line);
+  padding: 12px 0;
+}
+.log-entry summary {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  cursor: pointer;
+}
+.log-entry summary span {
+  color: var(--muted);
+}
+.log-message {
+  margin: 8px 0;
+  min-height: 0;
+}
+.scene-caption,
+.scene-warning {
+  padding: 10px 14px;
+  margin: 0;
+  font-size: 12px;
+}
+.spectator-notice {
+  display: block;
+}
+.spectator-notice .toolbar button {
+  margin-left: 0;
+}
+.scene-warning {
+  color: var(--text);
+  background: var(--panel);
+}
 @media (min-width: 1500px) {
   main {
     padding: 45px 55px;

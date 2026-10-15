@@ -12,7 +12,7 @@ from evoforge.supervisor.lifecycle import ACTIVE
 
 # CI installs the backend wheel; its package directory does not contain web/dist.
 # Select the frontend built by this checkout explicitly, as production wheel users do.
-os.environ["EVOFORGE_WEB_DIR"] = str(Path(__file__).resolve().parents[1] / "web" / "dist")
+os.environ.setdefault("EVOFORGE_WEB_DIR", str(Path(__file__).resolve().parents[1] / "web" / "dist"))
 
 with tempfile.TemporaryDirectory(prefix="evoforge-web-e2e-") as directory:
     app = create_app(directory, token="browser-test-token")

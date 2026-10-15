@@ -24,6 +24,8 @@ import { ExperimentForm } from "./ExperimentForm";
 import { Analytics, MetricChart } from "./Analytics";
 import { Spectator } from "./Spectator";
 import { SceneView } from "./SceneView";
+import { Timestamp } from "./Timestamp";
+import { WorkerLog } from "./WorkerLog";
 import type { Config, Experiment, Game } from "./types";
 const pages = [
   ["Dashboard", LayoutDashboard],
@@ -35,7 +37,7 @@ const pages = [
   ["Logs", Terminal],
   ["Settings", Settings],
 ] as const;
-const active = ["STARTING", "RUNNING", "PAUSED", "STOPPING"];
+const active = ["QUEUED", "STARTING", "RUNNING", "PAUSED", "STOPPING"];
 const fmt = (n: unknown) =>
   typeof n === "number"
     ? new Intl.NumberFormat(undefined, {
@@ -158,6 +160,10 @@ export default function App() {
   const all = runs.data || [];
   const current =
     all.find((r) => r.id === selected) ||
+    all.find((r) => !r.archived && active.includes(r.status)) ||
+    [...all]
+      .filter((r) => !r.archived && dashboard.data?.latest[r.id])
+      .sort((a, b) => b.updated - a.updated)[0] ||
     all.find((r) => !r.archived) ||
     all[0];
   const id = current?.id || "";
@@ -239,11 +245,24 @@ export default function App() {
     setDialog({ run, action: kind });
   }
   function controls(run: Experiment) {
+    const finishedBudget =
+      run.status === "COMPLETED" &&
+      (run.worker?.generation ?? run.config.generations) >=
+        run.config.generations;
     return (
       <div className="toolbar run-controls">
         {!active.includes(run.status) && !run.archived && (
-          <button className="primary" onClick={() => action(run, "start")}>
-            Start
+          <button
+            className="primary"
+            disabled={finishedBudget}
+            title={
+              finishedBudget
+                ? "Extend the generation limit before continuing training"
+                : undefined
+            }
+            onClick={() => action(run, "start")}
+          >
+            {run.status === "CREATED" ? "Start" : "Continue training"}
           </button>
         )}
         {run.status === "RUNNING" && (
@@ -276,6 +295,12 @@ export default function App() {
         >
           Extend training
         </button>
+        {finishedBudget && (
+          <p className="muted">
+            Generation limit reached. Extend training to add generations, then
+            continue from the saved checkpoint. Duplicate creates a fresh run.
+          </p>
+        )}
       </div>
     );
   }
@@ -284,6 +309,9 @@ export default function App() {
     setSidebar(false);
     setCreating(false);
   }
+  useEffect(() => {
+    window.scrollTo({ top: 0 });
+  }, [page]);
   const latest = metrics.data?.at(-1);
   return (
     <div className="app-shell">
@@ -462,6 +490,22 @@ export default function App() {
               )}
               {page === "Dashboard" && (
                 <>
+                  <p className="muted">
+                    Results for selected experiment:{" "}
+                    <strong>{id || "None"}</strong>. Worker and experiment
+                    counts cover the whole workspace.
+                  </p>
+                  {current &&
+                    !metrics.isPending &&
+                    !metrics.data?.length &&
+                    !metrics.error && (
+                      <p className="notice">
+                        {id} has no measured generations yet. Select an
+                        experiment with results or start this experiment to
+                        collect measurements.
+                      </p>
+                    )}
+                  {metrics.error && <p role="alert">{metrics.error.message}</p>}
                   <section className="stat-grid">
                     {[
                       [
@@ -471,12 +515,12 @@ export default function App() {
                       ],
                       ["Experiments", all.length, "Across installed games"],
                       [
-                        "Latest champion",
+                        "Selected champion fitness",
                         latest?.hall_of_fame,
                         current?.id || "No experiment selected",
                       ],
                       [
-                        "Environment steps",
+                        "Selected environment steps",
                         latest?.environment_steps,
                         "Measured interactions",
                       ],
@@ -491,7 +535,7 @@ export default function App() {
                   <div className="dashboard-grid">
                     <div>
                       <MetricChart
-                        title="Learning over generations"
+                        title={`Learning over generations${id ? ` · ${id}` : ""}`}
                         rows={metrics.data || []}
                         keys={["best_train", "mean_train", "best_validation"]}
                       />
@@ -621,10 +665,7 @@ export default function App() {
                                 <span>
                                   <b>{e.experiment}</b>
                                   <small>
-                                    {e.type} ·{" "}
-                                    {new Date(
-                                      e.timestamp * 1000,
-                                    ).toLocaleTimeString()}
+                                    {e.type} · <Timestamp value={e.timestamp} />
                                   </small>
                                 </span>
                               </div>
@@ -814,11 +855,7 @@ export default function App() {
                         <p className="muted">
                           PID {r.worker?.pid} · generation{" "}
                           {r.worker?.generation} · heartbeat{" "}
-                          {r.worker
-                            ? new Date(
-                                r.worker.heartbeat * 1000,
-                              ).toLocaleTimeString()
-                            : "—"}
+                          <Timestamp value={r.worker?.heartbeat} />
                         </p>
                         {r.worker?.request && (
                           <p>Pending request: {r.worker.request}</p>
@@ -840,11 +877,13 @@ export default function App() {
                     <span className="badge">Refreshes every 2s</span>
                   </div>
                   {logs.data?.truncated && <p>Showing the latest 64 KiB.</p>}
-                  <pre className="log-view">
-                    {logs.error?.message ||
-                      logs.data?.text ||
-                      "No worker output yet."}
-                  </pre>
+                  {logs.error ? (
+                    <p role="alert">{logs.error.message}</p>
+                  ) : logs.isPending && id ? (
+                    <p>Loading worker output…</p>
+                  ) : (
+                    <WorkerLog text={logs.data?.text || ""} />
+                  )}
                 </section>
               )}
               {page === "Settings" && (
@@ -927,7 +966,13 @@ export default function App() {
                   ? "Archive this experiment while preserving all its data."
                   : dialog.action === "stop"
                     ? "Stop training cooperatively. Completed generations and saved recordings are preserved."
-                    : `Apply ${dialog.action} to ${dialog.run.id}?`}
+                    : dialog.action === "start"
+                      ? dialog.run.status === "CREATED"
+                        ? `Start training ${dialog.run.id} using its configured generation limit?`
+                        : `Continue ${dialog.run.id} from its latest checkpoint up to ${dialog.run.config.generations} generations. Existing results and recordings are preserved.`
+                      : dialog.action === "extend"
+                        ? "Increase the generation limit. This does not start a worker; use Continue training afterward."
+                        : `Apply ${dialog.action} to ${dialog.run.id}?`}
             </p>
             <form
               onSubmit={(e) => {

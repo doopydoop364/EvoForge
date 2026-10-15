@@ -248,8 +248,14 @@ export function Analytics({
         />
         <MetricChart
           rows={history.filter((r) => Number(r.ppo_refinements) > 0)}
-          keys={["ppo_loss", "ppo_steps"]}
-          title="PPO statistics · where available"
+          keys={["ppo_loss"]}
+          title="PPO loss · where available"
+          x={axis}
+        />
+        <MetricChart
+          rows={history.filter((r) => Number(r.ppo_refinements) > 0)}
+          keys={["ppo_steps"]}
+          title="PPO steps · where available"
           x={axis}
         />
         <section className="panel">

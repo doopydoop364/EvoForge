@@ -7,6 +7,11 @@ import { ExperimentForm } from "../src/ExperimentForm";
 import { api } from "../src/api";
 import { SceneView } from "../src/SceneView";
 import { MetricChart } from "../src/Analytics";
+import { WorkerLog } from "../src/WorkerLog";
+import { capturedScene } from "../src/capturedScene";
+import { Spectator } from "../src/Spectator";
+import * as stream from "../src/stream";
+import type { Experiment } from "../src/types";
 vi.mock("pixi.js", () => ({
   Application: class {
     async init() {
@@ -27,6 +32,40 @@ const game = {
   observation_size: 4,
   action_size: 2,
   score_name: "correct",
+};
+const completedRun: Experiment = {
+  id: "finished",
+  status: "COMPLETED",
+  archived: 0,
+  created: 1,
+  updated: 2,
+  game_version: "1.0.0",
+  config: {
+    game: "coin",
+    mode: "evolution",
+    generations: 20,
+    population: 4,
+    elites: 1,
+    ppo_candidates: 0,
+    ppo_episodes: 1,
+    eval_episodes: 1,
+    size: 10,
+    max_steps: 50,
+    seed: 42,
+    hidden: [8],
+    mutation_probability: 0.1,
+    mutation_sigma: 0.1,
+    game_config: {},
+    environment_step_budget: null,
+  },
+  worker: {
+    generation: 20,
+    heartbeat: 1792015612,
+    pid: 12,
+    identity: "worker",
+    error: null,
+    request: null,
+  },
 };
 function wrap(component: React.ReactNode) {
   return render(
@@ -59,6 +98,61 @@ function mockBackend() {
   });
 }
 describe("workspace", () => {
+  it("selects a run with results by default and explains an explicitly selected empty run", async () => {
+    mockBackend();
+    const empty = {
+      ...completedRun,
+      id: "empty",
+      status: "CREATED",
+      worker: null,
+    };
+    vi.spyOn(api, "runs").mockResolvedValue([empty, completedRun]);
+    const dashboard = await api.dashboard();
+    vi.spyOn(api, "dashboard").mockResolvedValue({
+      ...dashboard,
+      latest: { finished: { generation: 19, hall_of_fame: 1.84 } },
+    });
+    vi.spyOn(api, "metrics").mockImplementation(async (id) =>
+      id === "finished"
+        ? [{ generation: 19, hall_of_fame: 1.84, environment_steps: 77505 }]
+        : [],
+    );
+    wrap(<App />);
+    await waitFor(() =>
+      expect(screen.getByLabelText("Open experiment")).toHaveValue("finished"),
+    );
+    expect(await screen.findByText("77,505")).toBeInTheDocument();
+    await userEvent.selectOptions(
+      screen.getByLabelText("Open experiment"),
+      "empty",
+    );
+    expect(
+      await screen.findByText(/empty has no measured generations yet/),
+    ).toBeInTheDocument();
+  });
+  it("requires a generation extension before continuing a completed run", async () => {
+    mockBackend();
+    vi.spyOn(api, "runs").mockResolvedValue([completedRun]);
+    vi.spyOn(api, "metrics").mockResolvedValue([]);
+    vi.spyOn(api, "checkpoints").mockResolvedValue([]);
+    wrap(<App />);
+    await screen.findByText("Backend connected");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Experiments" }),
+    );
+    expect(
+      await screen.findByRole("button", {
+        name: "Continue training",
+      }),
+    ).toBeDisabled();
+    expect(screen.getByText(/Generation limit reached/)).toBeInTheDocument();
+    await userEvent.click(
+      screen.getByRole("button", { name: "Extend training" }),
+    );
+    expect(screen.getByRole("dialog")).toHaveTextContent(
+      "This does not start a worker",
+    );
+  });
   it("renders an honest empty dashboard", async () => {
     mockBackend();
     wrap(<App />);
@@ -145,6 +239,62 @@ describe("configuration", () => {
   });
 });
 describe("rendering and analytics", () => {
+  it("labels inactive telemetry independently of its connected socket", async () => {
+    vi.spyOn(stream, "useSpectator").mockReturnValue({
+      frames: [],
+      status: "Connected",
+      gap: false,
+    });
+    vi.spyOn(api, "replays").mockResolvedValue([]);
+    wrap(<Spectator run={completedRun} />);
+    expect(screen.getByText("Saved frames")).toBeInTheDocument();
+    expect(screen.getByLabelText("Mode")).toHaveDisplayValue(
+      "Last Training Frames",
+    );
+    expect(
+      screen.getByText(/Telemetry connection: Connected/),
+    ).toHaveTextContent("No live training is running");
+    await userEvent.click(
+      screen.getByRole("button", { name: "Open champion replay" }),
+    );
+    expect(screen.getByLabelText("Mode")).toHaveValue("champion");
+    expect(
+      screen.getByRole("button", { name: "Load replay" }),
+    ).toBeInTheDocument();
+  });
+  it("renders legacy cells at their captured positions and rejects unrelated text", () => {
+    const scene = capturedScene("snake", "Hoo\n...\n..*");
+    expect(scene?.nodes.filter((n) => n.asset === "head")).toEqual([
+      expect.objectContaining({ x: 0, y: 0 }),
+    ]);
+    expect(scene?.nodes.find((n) => n.asset === "food")).toMatchObject({
+      x: 64,
+      y: 64,
+    });
+    expect(scene?.nodes.filter((n) => n.asset === "body")).toHaveLength(2);
+    expect(
+      capturedScene("flappy", "H.#\n.. \n..#")?.nodes.find(
+        (n) => n.asset === "bird",
+      ),
+    ).toMatchObject({ x: 0, y: 0 });
+    expect(capturedScene("snake", "arbitrary output")).toBeUndefined();
+    expect(capturedScene("coin", "H.\n.*")).toBeUndefined();
+    expect(capturedScene("snake", "H.\n..*")).toBeUndefined();
+  });
+  it("makes structured logs readable while preserving plain output and raw JSON", async () => {
+    wrap(
+      <WorkerLog
+        text={
+          'Starting worker\n{"generation":19,"best_score":3.66,"environment_steps":77505}\npartial {line'
+        }
+      />,
+    );
+    expect(screen.getByText("Generation 19")).toBeInTheDocument();
+    expect(screen.getByText("Steps 77,505")).toBeInTheDocument();
+    expect(screen.getByText("partial {line")).toBeInTheDocument();
+    await userEvent.click(screen.getByText("Raw worker output"));
+    expect(screen.getByText(/"generation":19/)).toBeVisible();
+  });
   it("shows text fallback when assets or WebGL are missing", async () => {
     vi.spyOn(api, "manifest").mockResolvedValue({
       game: "coin",
