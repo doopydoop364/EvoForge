@@ -38,6 +38,17 @@ class GamePlugin:
     def render(self) -> str:
         return ""
 
+    def render_terminal(self) -> str:
+        return self.render()
+
+    def render_scene(self) -> dict | None:
+        """Optional renderer-v1 scene; called only for sampled presentation."""
+        return None
+
+    @classmethod
+    def get_asset_manifest(cls) -> dict:
+        return {"protocol": 1, "assets": {}}
+
     def spectator_frame(self) -> dict:
         return {"text": self.render()}
 

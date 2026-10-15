@@ -89,6 +89,20 @@ class Flappy:
             {"food": self.score, "score": self.score, "steps": self.steps},
         )
 
+    def render_scene(self):
+        from .rendering.builtin import scene
+
+        return scene(self, "flappy")
+
+    def render_terminal(self):
+        return self.render()
+
+    @classmethod
+    def get_asset_manifest(cls):
+        from .rendering.builtin import manifest
+
+        return manifest("flappy")
+
     def render(self):
         lines = []
         for y in range(self.size):

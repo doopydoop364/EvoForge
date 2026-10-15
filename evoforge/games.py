@@ -104,9 +104,24 @@ def transition(env, action):
 
 
 def frame(env):
-    if hasattr(env, "spectator_frame"):
-        return env.spectator_frame()
-    return {"text": env.render(), "score": metric(env), "steps": env.steps}
+    data = (
+        env.spectator_frame()
+        if hasattr(env, "spectator_frame")
+        else {"text": env.render(), "score": metric(env), "steps": env.steps}
+    )
+    provider = getattr(env, "plugin", env)
+    render = getattr(provider, "render_scene", None)
+    if render:
+        try:
+            scene = render()
+            if scene is not None:
+                from .rendering.schema import validate_scene
+
+                data["scene"] = validate_scene(scene)
+        except (ValueError, TypeError) as exc:
+            # A presentation error must not fail otherwise-valid simulation.
+            data["render_error"] = str(exc)[:512]
+    return data
 
 
 def close_env(env):
