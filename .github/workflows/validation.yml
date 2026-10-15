@@ -58,3 +58,33 @@ jobs:
         with:
           name: release-candidate-packages
           path: dist/*
+  web:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: python -m venv .venv
+      - run: .venv/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+      - run: .venv/bin/python -m pip install '.[dev,tui,api]' ./examples/coin-game
+      - run: npm --prefix web ci
+      - run: npm --prefix web run typecheck
+      - run: npm --prefix web run lint
+      - run: npm --prefix web test
+      - run: npm --prefix web run build
+      - run: npx playwright install --with-deps chromium
+        working-directory: web
+      - run: npm --prefix web run test:e2e
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: web-browser-validation
+          path: |
+            web/test-results
+            web/playwright-report
