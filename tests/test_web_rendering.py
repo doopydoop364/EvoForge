@@ -312,3 +312,50 @@ def test_dashboard_cpu_usage_is_measured_from_successive_samples(tmp_path, monke
     with TestClient(create_app(tmp_path)) as client:
         assert client.get("/api/v1/dashboard").json()["resources"]["cpu_percent"] is None
         assert client.get("/api/v1/dashboard").json()["resources"]["cpu_percent"] == 75.0
+
+
+def test_supplied_sprites_keep_their_source_bytes():
+    import hashlib
+    import json
+    from pathlib import Path
+
+    import evoforge.rendering.assets as assets_module
+
+    root = Path(assets_module.__file__).parent / "assets"
+    sources = json.loads((root / "SPRITE-SOURCES.json").read_text())
+    assert len(sources) == 23
+    for name, record in sources.items():
+        assert hashlib.sha256((root / name).read_bytes()).hexdigest() == record["sha256"]
+        assert (root / name).read_bytes().startswith(b"\x89PNG\r\n\x1a\n")
+    for game in ("snake", "flappy"):
+        assert all(
+            asset["scale_mode"] == "nearest" for asset in public_manifest(game)["assets"].values()
+        )
+
+
+def test_nokia_segments_follow_the_actual_snake_topology():
+    from evoforge.rendering.builtin import snake_segment_asset
+
+    body = [(2, 0), (2, 1), (1, 1), (0, 1)]
+    assert snake_segment_asset(body, 0, 0) == "head-up"
+    assert snake_segment_asset(body, 1, 0) == "turn-2"
+    assert snake_segment_asset(body, 2, 0) == "body-right"
+    assert snake_segment_asset(body, 3, 0) == "tail-right"
+
+
+def test_flappy_scene_uses_whole_pipes_and_original_bird_aspect():
+    env = make_env("flappy")
+    try:
+        env.reset(42)
+        scene = frame(env)["scene"]
+        pipes = [n for n in scene["nodes"] if n["asset"] == "pipe"]
+        assert 1 <= len(pipes) <= 2
+        upper = next(n for n in pipes if n["id"] == "pipe-upper")
+        assert upper["scale_y"] == -1 and upper["y"] == upper["height"]
+        bird = next(n for n in scene["nodes"] if n["id"] == "player")
+        assert bird["height"] / bird["width"] == pytest.approx(24 / 34)
+        assert scene["animations"]["flap"]["frames"] == ["bird-up", "bird", "bird-down", "bird"]
+        ground = next(n for n in scene["nodes"] if n["id"] == "ground")
+        assert ground["y"] + ground["height"] == scene["height"]
+    finally:
+        close_env(env)

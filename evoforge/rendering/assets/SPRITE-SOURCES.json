@@ -1,0 +1,94 @@
+{
+  "flappy-background-day.png": {
+    "source": "https://raw.githubusercontent.com/sourabhv/FlapPyBird/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites/background-day.png",
+    "sha256": "472c806b3caea5f65e9059e6b2ae1a5bb8728deeab38b65c83eb14e693b56921"
+  },
+  "flappy-yellowbird-upflap.png": {
+    "source": "https://raw.githubusercontent.com/sourabhv/FlapPyBird/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites/yellowbird-upflap.png",
+    "sha256": "8f0f7372cbfcf5d663077f28377d033807360b33cdfbd2f220bb84fea27a1131"
+  },
+  "flappy-yellowbird-midflap.png": {
+    "source": "https://raw.githubusercontent.com/sourabhv/FlapPyBird/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites/yellowbird-midflap.png",
+    "sha256": "09b80bf4f6f51b4ef421c459fb6140eb0ece14ccb74d637559b50134354c7bbf"
+  },
+  "flappy-yellowbird-downflap.png": {
+    "source": "https://raw.githubusercontent.com/sourabhv/FlapPyBird/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites/yellowbird-downflap.png",
+    "sha256": "9c691e789dcb75158b24642d3d902bf918b7be259c5df6b8e504665b32fef860"
+  },
+  "flappy-pipe-green.png": {
+    "source": "https://raw.githubusercontent.com/sourabhv/FlapPyBird/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites/pipe-green.png",
+    "sha256": "8a3fb1ec2fcc5b899a02af626dd6c7e52138faf3dfd64d5dce4b4e028b503edb"
+  },
+  "flappy-base.png": {
+    "source": "https://raw.githubusercontent.com/sourabhv/FlapPyBird/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites/base.png",
+    "sha256": "8afccfb7030e32c736c6433fc48990aa5b47332ddf184206e4e570fdc600f083"
+  },
+  "nokia-headu.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/headu.png",
+    "sha256": "4d81069ebb072adaafcbd4cd58601a8bf32f607fbf6633f036884ed5397f2bbb"
+  },
+  "nokia-headd.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/headd.png",
+    "sha256": "ae9304e21cb476e39cc775fb142585e97a05c3f06a119ba57f8ea1d12bdafd81"
+  },
+  "nokia-headl.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/headl.png",
+    "sha256": "a2069e5c06452e799620165615ccaafdaf4cc4574c42c4f5ebaf23c1bdb19337"
+  },
+  "nokia-headr.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/headr.png",
+    "sha256": "108ba38121e6160038d29ce94bfbf64a126e767966139b59c9cfbff8afb42947"
+  },
+  "nokia-bodyu.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/bodyu.png",
+    "sha256": "306894b8c6f1bd6490ad3bc8410112b4c4d0a0c174ec341f6ebe6e772d2b4b8b"
+  },
+  "nokia-bodyd.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/bodyd.png",
+    "sha256": "b31b4436940c0bfe81e5af43ff0747c343553f593d4f9b53ba434bd5d4081013"
+  },
+  "nokia-bodyl.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/bodyl.png",
+    "sha256": "e29ad19a2e9be0b191214da8a842f108be462ddb1181b5a5e3a1815fc3c05d9a"
+  },
+  "nokia-bodyr.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/bodyr.png",
+    "sha256": "333722543ee6c2f2c0d6973ed19a6965ac9c15c407b4e9b529ad865746e3fa09"
+  },
+  "nokia-tailu.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/tailu.png",
+    "sha256": "8e3a5f4064bedab3c35c12921bb98561904baa17bac52f91b6fac132a8773a30"
+  },
+  "nokia-taild.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/taild.png",
+    "sha256": "7b2fcedd0fd85da8e14783ed70c56d72aa672c15919603f4c52da07da8099832"
+  },
+  "nokia-taill.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/taill.png",
+    "sha256": "49cdc7c4d60a1670ea95e796328e4211dbc4433819c2a386d4cf05f191b5b6f4"
+  },
+  "nokia-tailr.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/tailr.png",
+    "sha256": "ac3c46069544ffb9b4e51541cfcb3de147c93de1738ce71ca3f8c71bb68848b8"
+  },
+  "nokia-turn0.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/turn0.png",
+    "sha256": "7241e1e26da0722b9d1df4645d9cf462033da935dd0f455774595f0143803eaa"
+  },
+  "nokia-turn1.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/turn1.png",
+    "sha256": "22a5bd139967e7a6f6f261d4b288d32fe17400100f7e52ef9971f2edf1bcc570"
+  },
+  "nokia-turn2.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/turn2.png",
+    "sha256": "3d7a0f938965ac030ce700ca28c353acdab04b1f6f7227804ca31d1e9d8d1cb7"
+  },
+  "nokia-turn3.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/turn3.png",
+    "sha256": "7ec4d0eed2b4e4e77ce84e1d068ae247667de3a5c3f2a0b60f41a23f4fb48c9e"
+  },
+  "nokia-nibble.png": {
+    "source": "https://www.helpfulsheep.com/snake/images/nibble.png",
+    "sha256": "2e790f949e5f15313e28fb92f0b6a265c58451249dc8989ecaacbdca2f229a4d"
+  }
+}

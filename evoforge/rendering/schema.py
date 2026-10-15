@@ -91,6 +91,7 @@ def validate_scene(value):
 class Asset(Model):
     path: str = Field(min_length=1, max_length=200)
     media_type: Literal["image/png", "image/webp", "image/svg+xml", "application/json"]
+    scale_mode: Literal["linear", "nearest"] = "linear"
 
 
 class Manifest(Model):

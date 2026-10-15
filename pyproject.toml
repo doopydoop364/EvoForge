@@ -33,4 +33,4 @@ select = ["E4", "E7", "E9", "F", "I"]
 markers = ["integration: real subprocess or cross-component integration", "textual: Textual pilot interaction"]
 
 [tool.setuptools.package-data]
-"evoforge.rendering" = ["assets/*.svg", "assets/*.txt"]
+"evoforge.rendering" = ["assets/*.svg", "assets/*.png", "assets/*.json", "assets/*.txt"]

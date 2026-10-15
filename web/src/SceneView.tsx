@@ -97,6 +97,7 @@ export function SceneView({
               const texture = await Assets.load<Texture>({
                 src: url.href,
                 parser,
+                data: { scaleMode: asset.scale_mode || "linear" },
               });
               if (!texture) throw Error("No texture returned");
               textures.set(id, texture);

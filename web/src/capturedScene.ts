@@ -49,9 +49,9 @@ export function capturedScene(game: string, text: string): Scene | undefined {
     "captured-background",
     game === "snake" ? "board" : "sky",
     0,
-    0,
+    game === "flappy" ? size * 32 - (size * 32 * 512) / 288 : 0,
     size * 32,
-    size * 32,
+    game === "flappy" ? (size * 32 * 512) / 288 : size * 32,
   );
   background.layer = -2;
   const nodes = [background];
@@ -70,16 +70,58 @@ export function capturedScene(game: string, text: string): Scene | undefined {
       : { H: "bird", "#": "pipe" };
   rows.forEach((row, y) =>
     [...row].forEach((cell, x) => {
+      if (game === "flappy" && cell === "#") return;
       if (symbols[cell])
-        nodes.push(node(`captured-${x}-${y}`, symbols[cell], x * 32, y * 32));
+        nodes.push(
+          node(
+            `captured-${x}-${y}`,
+            symbols[cell],
+            x * 32,
+            y * 32 + (game === "flappy" ? (32 - (32 * 24) / 34) / 2 : 0),
+            32,
+            game === "flappy" ? (32 * 24) / 34 : 32,
+          ),
+        );
     }),
   );
+  const groundHeight =
+    game === "flappy" ? Math.round((size * 32 * 112) / 336) : 0;
+  if (game === "flappy") {
+    for (let x = 0; x < size; x++) {
+      for (let y = 0; y < size; y++) {
+        if (rows[y][x] !== "#") continue;
+        const start = y;
+        while (y + 1 < size && rows[y + 1][x] === "#") y++;
+        const pipe = node(
+          `captured-pipe-${x}-${start}`,
+          "pipe",
+          x * 32,
+          start === 0 ? (y + 1) * 32 : start * 32,
+          32,
+          (y - start + 1) * 32,
+        );
+        if (start === 0) pipe.scale_y = -1;
+        nodes.push(pipe);
+      }
+    }
+    nodes.push({
+      ...node(
+        "captured-ground",
+        "ground",
+        0,
+        size * 32,
+        size * 32,
+        groundHeight,
+      ),
+      layer: 2,
+    });
+  }
   return {
     protocol: 1,
     width: size * 32,
-    height: size * 32,
+    height: size * 32 + groundHeight,
     coordinates: "y-down",
-    background: "#112622",
+    background: game === "snake" ? "#b2bd08" : "#4ec0ca",
     timestamp: 0,
     camera: null,
     animations: {},

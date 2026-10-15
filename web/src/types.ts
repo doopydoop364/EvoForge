@@ -79,7 +79,15 @@ export type Scene = {
 export type Manifest = {
   protocol: 1;
   game: string;
-  assets: Record<string, { url: string; version: string; media_type: string }>;
+  assets: Record<
+    string,
+    {
+      url: string;
+      version: string;
+      media_type: string;
+      scale_mode?: "linear" | "nearest";
+    }
+  >;
 };
 export type Frame = {
   seq: number;

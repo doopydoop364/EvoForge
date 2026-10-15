@@ -152,5 +152,6 @@ def public_manifest(game):
             "media_type": media_type,
             "bytes": len(data),
             "version": digest,
+            "scale_mode": manifest.assets[identifier].scale_mode,
         }
     return {"protocol": 1, "game": game, "assets": assets}

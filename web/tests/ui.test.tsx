@@ -272,11 +272,12 @@ describe("rendering and analytics", () => {
       y: 64,
     });
     expect(scene?.nodes.filter((n) => n.asset === "body")).toHaveLength(2);
-    expect(
-      capturedScene("flappy", "H.#\n.. \n..#")?.nodes.find(
-        (n) => n.asset === "bird",
-      ),
-    ).toMatchObject({ x: 0, y: 0 });
+    const bird = capturedScene("flappy", "H.#\n.. \n..#")?.nodes.find(
+      (n) => n.asset === "bird",
+    );
+    expect(bird?.x).toBe(0);
+    expect(bird!.y + bird!.height / 2).toBe(16);
+    expect(bird!.width / bird!.height).toBeCloseTo(34 / 24);
     expect(capturedScene("snake", "arbitrary output")).toBeUndefined();
     expect(capturedScene("coin", "H.\n.*")).toBeUndefined();
     expect(capturedScene("snake", "H.\n..*")).toBeUndefined();

@@ -1,4 +1,6 @@
 EvoForge original geometric art, created for this project. CC0 1.0 Universal.
 To the extent possible under law, the contributors waive all copyright and related
 rights to these SVG illustrations. https://creativecommons.org/publicdomain/zero/1.0/
-No third-party game sprites or fonts are included.
+This CC0 notice covers only EvoForge SVG illustrations. Third-party PNG sprites
+and their provenance are documented separately in SPRITE-SOURCES.txt and
+SPRITE-SOURCES.json. The CC0 notice does not cover those PNG files.

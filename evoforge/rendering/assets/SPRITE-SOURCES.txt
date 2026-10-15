@@ -1,0 +1,33 @@
+Game artwork sources
+====================
+
+Flappy Bird
+-----------
+The six flappy-*.png files are copied byte-for-byte from sourabhv/FlapPyBird,
+revision 95af73307f7c05f2ba8f208e911097cbb56b689a:
+https://github.com/sourabhv/FlapPyBird/tree/95af73307f7c05f2ba8f208e911097cbb56b689a/assets/sprites
+
+These are the familiar Flappy Bird game sprites, preserved without recoloring,
+resizing, or AI regeneration. Flappy Bird and its original artwork are credited
+to Dong Nguyen / .GEARS. The supplying project's MIT notice is retained in
+FLAPPYBIRD-LICENSE.txt; this notice does not assert ownership of the original
+commercial game's artwork or relicense it as EvoForge CC0 artwork.
+
+Classic Nokia Snake II
+---------------------
+The seventeen nokia-*.png files are copied byte-for-byte from HelpfulSheep's
+browser recreation of Nokia Snake II:
+https://www.helpfulsheep.com/snake/
+https://www.helpfulsheep.com/snake/scripts/script.js
+
+The supplying page identifies itself as a remake. These are its monochrome
+Nokia-style sprites, not a verified extraction from Nokia phone firmware.
+Nokia's original game is credited to Nokia / Taneli Armanto; the supplying
+browser recreation is credited to HelpfulSheep. No CC0 license is claimed for
+these third-party PNGs. The flat SVG LCD backgrounds use the recreation's
+#b2bd08 display color.
+
+SPRITE-SOURCES.json records the exact source URL and SHA-256 of every PNG.
+All sprite PNGs are used unchanged. Directions and animation frames select
+among the supplied files; transformations happen only during presentation.
+Training rules, observation space, rewards, and saved checkpoints are unchanged.

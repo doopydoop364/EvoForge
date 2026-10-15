@@ -82,7 +82,10 @@ when upgrading; see [migration](docs/training.md#checkpoint-schema-1).
 
 EvoForge now includes a responsive React control center for experiment lifecycle,
 worker controls, measured analytics, plugin discovery and a generic PixiJS spectator.
-Snake, Flappy and the installed Coin example provide original visual assets.
+Snake uses monochrome Nokia Snake II sprites supplied by HelpfulSheep; Flappy
+uses the familiar Flappy Bird artwork supplied by FlapPyBird. Source attribution
+and exact sprite hashes are included with the assets. The Coin example retains
+its original EvoForge artwork.
 Sampled episodes are recorded for later playback; champion and population replay
 run independently from training. The Textual application remains supported.
 

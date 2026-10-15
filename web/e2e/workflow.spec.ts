@@ -59,7 +59,16 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   await expect(page.locator("canvas")).toHaveCount(3);
   // A canvas alone also passes when every sprite is a placeholder. Verify the
   // extensionless assets actually reached the image loaders for all plugins.
-  await expect.poll(() => loadedAssets.size).toBe(12);
+  const manifests = await Promise.all(
+    ["snake", "flappy", "coin"].map(async (game) =>
+      (await page.request.get(`/api/v1/games/${game}/manifest`)).json(),
+    ),
+  );
+  const expectedAssets = manifests.reduce(
+    (count, manifest) => count + Object.keys(manifest.assets).length,
+    0,
+  );
+  await expect.poll(() => loadedAssets.size).toBe(expectedAssets);
   expect(renderWarnings).toEqual([]);
   await expect(page.locator(".scene-warning")).toHaveCount(0);
   await page.screenshot({
