@@ -9,6 +9,7 @@ from pathlib import Path
 from textual import on
 from textual.app import App, ComposeResult
 from textual.containers import Grid, Horizontal, VerticalScroll
+from textual.layouts.grid import GridLayout
 from textual.reactive import reactive
 from textual.widgets import (
     Button,
@@ -54,32 +55,24 @@ class ResponsiveActions(Grid):
     ResponsiveActions Button { width: 1fr; min-width: 0; height: 3; margin: 0; }
     """
 
-    def on_mount(self):
-        self.call_after_refresh(self._reflow)
-
-    def on_resize(self):
-        self._reflow()
-
-    def _reflow(self):
-        buttons = list(self.query_children(Button))
-        width = self.content_size.width
-        if not buttons or width <= 0:
+    def pre_layout(self, layout):
+        # Configure responsive columns during the layout itself. Resize messages
+        # arrive after the first paint; moving controls in that handler makes a
+        # click aimed at a newly visible tab land at the button's old position.
+        if not isinstance(layout, GridLayout):
             return
-        cell_width = min(
-            width,
-            max(
+        buttons = list(self.query_children(Button))
+        layout.min_column_width = max(
+            [
                 16,
                 *(
                     b.get_content_width(self.size, self.size) + b.styles.gutter.width
                     for b in buttons
                 ),
-            ),
+            ]
         )
-        columns = min(len(buttons), max(1, (width + 1) // (cell_width + 1)))
-        rows = (len(buttons) + columns - 1) // columns
-        self.styles.grid_size_columns = columns
-        self.styles.grid_columns = str(cell_width)
-        self.styles.height = rows * 3 + (rows - 1)
+        layout.regular = False
+        layout.stretch_height = False
 
 
 class EvoForgeApp(App):
