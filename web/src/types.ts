@@ -1,0 +1,142 @@
+export type Config = {
+  game: string;
+  mode: string;
+  population: number;
+  generations: number;
+  elites: number;
+  ppo_candidates: number;
+  ppo_episodes: number;
+  eval_episodes: number;
+  size: number;
+  max_steps: number;
+  seed: number;
+  hidden: number | number[];
+  mutation_probability: number;
+  mutation_sigma: number;
+  game_config: Record<string, unknown>;
+  environment_step_budget: number | null;
+};
+export type Experiment = {
+  id: string;
+  config: Config;
+  status: string;
+  archived: number;
+  created: number;
+  updated: number;
+  game_version: string;
+  worker: null | {
+    identity: string;
+    pid: number;
+    heartbeat: number;
+    generation: number;
+    error: string | null;
+    request: string | null;
+  };
+};
+export type Game = {
+  id: string;
+  name: string;
+  version: string;
+  observation_size: number;
+  action_size: number;
+  score_name: string;
+};
+export type Metric = Record<string, number | string | null>;
+export type Node = {
+  id: string;
+  kind: "sprite" | "rect" | "text" | "tilemap";
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  rotation: number;
+  scale_x: number;
+  scale_y: number;
+  layer: number;
+  visible: boolean;
+  opacity: number;
+  asset: string | null;
+  animation: string | null;
+  text: string;
+  color: string;
+  font_size: number;
+  hud: boolean;
+  columns: number;
+  tiles: number[];
+  palette: string[];
+};
+export type Scene = {
+  protocol: 1;
+  width: number;
+  height: number;
+  coordinates: "y-down" | "y-up";
+  background: string;
+  timestamp: number;
+  camera: null | { x: number; y: number; zoom: number };
+  nodes: Node[];
+  animations: Record<string, { frames: string[]; fps: number }>;
+};
+export type Manifest = {
+  protocol: 1;
+  game: string;
+  assets: Record<string, { url: string; version: string; media_type: string }>;
+};
+export type Frame = {
+  seq: number;
+  timestamp: number;
+  step: number;
+  score: number;
+  reward: number;
+  terminated: boolean;
+  truncated: boolean;
+  scene?: Scene | null;
+  text?: string;
+};
+export type LiveFrame = Frame & {
+  experiment: string;
+  agent: string;
+  generation: number;
+  episode: string;
+  episode_index: number;
+  worker: string;
+  data: { scene?: Scene; text?: string; render_error?: string };
+};
+export type Recording = {
+  id: string;
+  run: string;
+  game: string;
+  game_version: string;
+  agent: string;
+  seed: number | null;
+  generation: number;
+  episode: string;
+  source: string;
+  created: number;
+  complete: boolean;
+  sampled: boolean;
+  dropped: number;
+  frame_count: number;
+  duration: number;
+  score: number;
+  frames?: Frame[];
+};
+export type DashboardData = {
+  active_workers: number;
+  experiments: number;
+  latest: Record<string, Metric | null>;
+  resources: {
+    cpu_count: number;
+    load_average: number[] | null;
+    memory_used_bytes: number | null;
+    memory_total_bytes: number | null;
+    gpu: { available: boolean; note: string };
+  };
+  activity: {
+    seq: number;
+    timestamp: number;
+    experiment: string;
+    type: string;
+    data: Record<string, unknown>;
+  }[];
+  warnings: { experiment: string; error: string }[];
+};

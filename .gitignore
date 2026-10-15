@@ -12,3 +12,6 @@ dist/
 .ruff_cache/
 *.sqlite*
 *.tmp
+node_modules/
+web/test-results/
+web/playwright-report/
