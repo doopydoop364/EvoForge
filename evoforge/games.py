@@ -3,6 +3,7 @@
 from dataclasses import dataclass
 
 from .flappy import Flappy
+from .geometrydash import GeometryDash
 from .snake import Snake
 
 
@@ -19,6 +20,9 @@ class GameSpec:
 GAMES = {
     "snake": GameSpec("snake", "Snake", Snake, 17, 3, "apples"),
     "flappy": GameSpec("flappy", "Flappy-style", Flappy, 17, 3, "pipes"),
+    "geometrydash": GameSpec(
+        "geometrydash", "Geometry Dash-style", GeometryDash, 17, 3, "tiles cleared"
+    ),
 }
 
 

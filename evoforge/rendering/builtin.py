@@ -4,6 +4,10 @@ import time
 
 
 def manifest(game):
+    if game == "geometrydash":
+        # This simulator provides terminal frames. A missing graphical layer is
+        # a supported capability, not a missing-asset error.
+        return {"protocol": 1, "assets": {}}
     if game == "snake":
         paths = {
             "board": "board.svg",

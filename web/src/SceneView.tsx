@@ -9,7 +9,7 @@ import {
   Texture,
 } from "pixi.js";
 import { useQuery } from "@tanstack/react-query";
-import { api } from "./api";
+import { api, ApiError } from "./api";
 import type { Scene, Node } from "./types";
 import { capturedScene } from "./capturedScene";
 
@@ -19,18 +19,21 @@ export function SceneView({
   text = "",
   zoom = 1,
   fps = 30,
+  display = "graphics",
 }: {
   scene?: Scene | null;
   game: string;
   text?: string;
   zoom?: number;
   fps?: number;
+  display?: "text" | "graphics";
 }) {
   const host = useRef<HTMLDivElement>(null);
   const presentation = useMemo(
     () => scene ?? capturedScene(game, text),
     [scene, game, text],
   );
+  const graphical = display === "graphics" && !!presentation;
   const [error, setError] = useState("");
   const [assetError, setAssetError] = useState("");
   const latest = useRef({ scene: presentation, zoom, fps });
@@ -39,10 +42,12 @@ export function SceneView({
     queryKey: ["manifest", game],
     queryFn: () => api.manifest(game),
     staleTime: Infinity,
-    enabled: !!game,
+    enabled: !!game && graphical,
+    retry: (attempt, error) =>
+      !(error instanceof ApiError && error.status === 404) && attempt < 2,
   });
   useEffect(() => {
-    if (!host.current || !manifest.data) return;
+    if (!graphical || !host.current || !manifest.data) return;
     const element = host.current;
     const app = new Application();
     let stopped = false;
@@ -252,28 +257,52 @@ export function SceneView({
       stopped = true;
       if (ready) app.destroy(true, { children: true });
     };
-  }, [game, manifest.data]);
-  if (scene && scene.protocol !== 1)
+  }, [game, manifest.data, graphical]);
+  if (graphical && scene && scene.protocol !== 1)
     return <p role="alert">Unsupported renderer protocol</p>;
   return (
     <div className="scene-wrap">
-      <div ref={host} className="scene-canvas" data-testid="scene-canvas" />
-      {assetError && (
+      <div
+        ref={host}
+        className="scene-canvas"
+        data-testid="scene-canvas"
+        hidden={!graphical}
+      />
+      {!graphical && (
+        <>
+          <pre className="scene-text">
+            {text || "Waiting for gameplay frames…"}
+          </pre>
+          {display === "graphics" && (
+            <p className="scene-caption">
+              This recording has no graphical scene. Showing captured text.
+            </p>
+          )}
+        </>
+      )}
+      {graphical && manifest.error && (
+        <p role="alert" className="scene-warning">
+          Game artwork could not be loaded: {manifest.error.message}
+          <button onClick={() => void manifest.refetch()}>
+            Retry graphics
+          </button>
+        </p>
+      )}
+      {graphical && assetError && (
         <p role="alert" className="scene-warning">
           {assetError}
         </p>
       )}
-      {(!presentation || error || manifest.isError) && (
+      {graphical && (error || manifest.isError) && (
         <pre className="scene-fallback">
           {error ? "Graphics unavailable. " : ""}
-          {manifest.isError ? "Assets unavailable. " : ""}
           {text || "Waiting for gameplay frames…"}
         </pre>
       )}
-      {!scene && presentation && (
+      {graphical && !scene && presentation && (
         <p className="scene-caption">Rendered from captured board text.</p>
       )}
-      {assetError && presentation && !error && (
+      {graphical && assetError && presentation && !error && (
         <pre>{text || "Captured text is unavailable."}</pre>
       )}
     </div>

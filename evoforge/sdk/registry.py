@@ -20,7 +20,9 @@ def register(plugin):
         raise ValueError(f"{info.id}: unsupported SDK version {info.sdk_version}")
     if not info.name or not info.version:
         raise ValueError("Game name and version are required")
-    if info.id in ("snake", "flappy") or (info.id in PLUGINS and PLUGINS[info.id] is not plugin):
+    from evoforge.games import GAMES
+
+    if info.id in GAMES or (info.id in PLUGINS and PLUGINS[info.id] is not plugin):
         raise ValueError(f"Duplicate game id: {info.id}")
     PLUGINS[info.id] = plugin
     return plugin

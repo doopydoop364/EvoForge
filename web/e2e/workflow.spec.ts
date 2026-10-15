@@ -98,6 +98,9 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   ).toBeVisible();
   await action(page, "Start");
   await nav(page, "Spectator");
+  await expect(page.getByLabel("Display", { exact: true })).toHaveValue("text");
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await page.getByLabel("Display", { exact: true }).selectOption("graphics");
   await expect(page.locator("canvas")).not.toHaveCount(0);
   await expect(
     page.getByText(/saved frame|sampled frame/).first(),
@@ -157,6 +160,7 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   await nav(page, "Spectator");
   await expect(page.getByText("Saved frames", { exact: true })).toBeVisible();
   await expect(page.getByText(/No live training is running/)).toBeVisible();
+  await page.getByLabel("Display", { exact: true }).selectOption("graphics");
   await page.getByLabel("Mode", { exact: true }).selectOption("recorded");
   const options = page.getByLabel("Saved episode").locator("option");
   await expect.poll(() => options.count()).toBeGreaterThan(1);
@@ -306,4 +310,39 @@ test("failed game assets produce a visible warning and captured text", async ({
     "Some game graphics could not be loaded",
   );
   await expect(snake.locator("pre")).toContainText("H");
+});
+
+test("saved Geometry Dash frames stay text-only without asset requests", async ({
+  page,
+}) => {
+  await login(page);
+  const assetRequests: string[] = [];
+  page.on("request", (request) => {
+    if (request.url().includes("/api/v1/games/geometrydash/manifest"))
+      assetRequests.push(request.url());
+  });
+  await page
+    .getByLabel("Open experiment", { exact: true })
+    .selectOption("saved-geometry-text");
+  await nav(page, "Spectator");
+  await expect(page.getByLabel("Display", { exact: true })).toHaveValue("text");
+  await expect(page.locator(".scene-text")).toHaveText(
+    "--X-------\n" + "          \n".repeat(7) + ".....^....\n##########",
+  );
+  await expect(page.locator("canvas")).toHaveCount(0);
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(assetRequests).toEqual([]);
+  await page.getByLabel("Display", { exact: true }).selectOption("graphics");
+  await expect(
+    page.getByText(
+      "This recording has no graphical scene. Showing captured text.",
+    ),
+  ).toBeVisible();
+  await expect(page.getByRole("alert")).toHaveCount(0);
+  expect(assetRequests).toEqual([]);
+  await page.getByLabel("Display", { exact: true }).selectOption("text");
+  await page.screenshot({
+    path: "test-results/geometrydash-text.png",
+    fullPage: true,
+  });
 });

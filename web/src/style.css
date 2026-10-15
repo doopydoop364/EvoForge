@@ -594,6 +594,14 @@ pre {
 .scene-canvas canvas {
   display: block;
 }
+.scene-text {
+  margin: 0;
+  min-height: 240px;
+  white-space: pre;
+  line-height: 1.5;
+  background: var(--bg);
+  color: var(--text);
+}
 .scene-fallback {
   position: absolute;
   inset: 0;

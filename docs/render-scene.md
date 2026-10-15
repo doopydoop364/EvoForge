@@ -7,6 +7,21 @@ and `get_asset_manifest()` and may retain `render()`/`render_terminal()` for Tex
 requested. It must not mutate simulation state. Invalid scenes produce an explicit
 `render_error` plus the existing text fallback; training continues.
 
+The spectator opens in **Text** mode for both sampled frames and replays. Text
+mode never requests an asset manifest or starts a graphics renderer. Users can
+select **Display → Game graphics** to view the game's optional presentation.
+A text-only game (including the Geometry Dash-style simulator) does not need
+assets; selecting graphics for a recording without a scene keeps its captured
+text visible with an explanation rather than reporting an asset failure.
+
+Plugins can provide their own graphical spectator through `render_scene()` and
+`get_asset_manifest()`: sprites, tilemaps, custom shapes, animations, camera
+position/zoom and a screen-space HUD are supported. Asset-free scenes can use
+rectangles and text with the default empty manifest. The renderer remains
+independent of training; a plugin must retain `render()` for Text mode. See the
+installed Coin example for an entire graphical plugin. Custom browser code is
+not required; the declarative renderer protocol is the extension interface.
+
 A scene declares `protocol: 1`, integer width/height (16–4096), `coordinates`
 (`y-down` default or `y-up`), six-digit hex background, timestamp, optional camera
 {x,y,zoom}, nodes and animations. Missing camera centers the full canvas. Units

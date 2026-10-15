@@ -16,11 +16,13 @@ function ReplayCard({
   game,
   focus,
   onFocus,
+  display,
 }: {
   record: Recording & { frames: Frame[] };
   game: string;
   focus: boolean;
   onFocus: () => void;
+  display: "text" | "graphics";
 }) {
   const [index, setIndex] = useState(0),
     [playing, setPlaying] = useState(false),
@@ -54,7 +56,12 @@ function ReplayCard({
           <Focus size={16} />
         </button>
       </div>
-      <SceneView scene={f?.scene} game={game} text={f?.text} />
+      <SceneView
+        scene={f?.scene}
+        game={game}
+        text={f?.text}
+        display={display}
+      />
       <div className="agent-stats">
         <span>
           Score <b>{f?.score ?? "—"}</b>
@@ -120,6 +127,7 @@ function ReplayCard({
 }
 export function Spectator({ run }: { run?: Experiment }) {
   const [mode, setMode] = useState("live"),
+    [display, setDisplay] = useState<"text" | "graphics">("text"),
     [seed, setSeed] = useState(900),
     [count, setCount] = useState(4),
     [zoom, setZoom] = useState(1),
@@ -188,6 +196,19 @@ export function Spectator({ run }: { run?: Experiment }) {
         </div>
         <div className="toolbar">
           <label>
+            Display
+            <select
+              aria-label="Display"
+              value={display}
+              onChange={(e) =>
+                setDisplay(e.target.value as "text" | "graphics")
+              }
+            >
+              <option value="text">Text</option>
+              <option value="graphics">Game graphics</option>
+            </select>
+          </label>
+          <label>
             Mode
             <select
               aria-label="Mode"
@@ -239,6 +260,7 @@ export function Spectator({ run }: { run?: Experiment }) {
                 Zoom
                 <select
                   aria-label="Zoom"
+                  disabled={display === "text"}
                   value={zoom}
                   onChange={(e) => setZoom(Number(e.target.value))}
                 >
@@ -253,6 +275,7 @@ export function Spectator({ run }: { run?: Experiment }) {
                 Frame rate
                 <select
                   aria-label="Frame rate"
+                  disabled={display === "text"}
                   value={fps}
                   onChange={(e) => setFps(Number(e.target.value))}
                 >
@@ -363,6 +386,7 @@ export function Spectator({ run }: { run?: Experiment }) {
                   text={f.data.text}
                   zoom={zoom}
                   fps={fps}
+                  display={display}
                 />
                 <div className="agent-stats">
                   <span>
@@ -434,6 +458,7 @@ export function Spectator({ run }: { run?: Experiment }) {
                     key={keys[i]}
                     record={q.data}
                     game={run.config.game}
+                    display={display}
                     focus={focused === q.data.agent}
                     onFocus={() => setFocused(focused ? "" : q.data!.agent)}
                   />

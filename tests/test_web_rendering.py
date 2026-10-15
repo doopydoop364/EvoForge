@@ -359,3 +359,79 @@ def test_flappy_scene_uses_whole_pipes_and_original_bird_aspect():
         assert ground["y"] + ground["height"] == scene["height"]
     finally:
         close_env(env)
+
+
+def test_geometrydash_is_registered_and_text_only(tmp_path):
+    from evoforge.games import available_games, game_spec
+
+    assert "geometrydash" in available_games()
+    assert game_spec("geometrydash").observation_size == 17
+    env = make_env("geometrydash", max_steps=50)
+    try:
+        env.reset(42)
+        data = frame(env)
+        assert "scene" not in data and len(data["text"].splitlines()) == env.size
+        assert "render_error" not in data
+    finally:
+        close_env(env)
+    with TestClient(create_app(tmp_path)) as client:
+        assert any(g["id"] == "geometrydash" for g in client.get("/api/v1/games").json())
+        response = client.get("/api/v1/games/geometrydash/manifest")
+        assert response.status_code == 200 and response.json()["assets"] == {}
+        preview = client.get("/api/v1/games/geometrydash/scene")
+        assert preview.status_code == 200 and "text" in preview.json()
+        assert "scene" not in preview.json()
+
+
+def test_plugins_can_supply_an_independent_graphical_scene_and_hud(tmp_path):
+    import numpy as np
+    from gymnasium import spaces
+
+    from evoforge.sdk import GameInfo, GamePlugin, register
+    from evoforge.sdk.registry import PLUGINS
+
+    class SpectatorPlugin(GamePlugin):
+        info = GameInfo("spectator-test", "Optional graphics")
+        observation_space = spaces.Box(0, 1, (2,), dtype=np.float32)
+        action_space = spaces.Discrete(2)
+
+        def reset(self, seed=None, options=None):
+            self.steps = 0
+            return np.zeros(2, dtype=np.float32), {"score": 0}
+
+        def render(self):
+            return f"Captured step {self.steps}"
+
+        def render_scene(self):
+            return {
+                "protocol": 1,
+                "width": 320,
+                "height": 240,
+                "camera": {"x": 160, "y": 120, "zoom": 1.5},
+                "nodes": [
+                    {
+                        "id": "player",
+                        "kind": "rect",
+                        "x": 20,
+                        "y": 30,
+                        "width": 32,
+                        "height": 32,
+                        "color": "#50dcff",
+                    },
+                    {"id": "hud", "kind": "text", "hud": True, "text": self.render()},
+                ],
+            }
+
+    register(SpectatorPlugin)
+    try:
+        env = make_env("spectator-test")
+        env.reset(42)
+        payload = frame(env)
+        assert payload["text"] == "Captured step 0"
+        assert env.plugin.steps == 0
+        assert payload["scene"]["camera"]["zoom"] == 1.5
+        assert payload["scene"]["nodes"][1]["hud"] is True
+        assert public_manifest("spectator-test")["assets"] == {}
+        close_env(env)
+    finally:
+        PLUGINS.pop("spectator-test", None)

@@ -137,9 +137,7 @@ describe("workspace", () => {
     vi.spyOn(api, "checkpoints").mockResolvedValue([]);
     wrap(<App />);
     await screen.findByText("Backend connected");
-    await userEvent.click(
-      screen.getByRole("button", { name: "Experiments" }),
-    );
+    await userEvent.click(screen.getByRole("button", { name: "Experiments" }));
     expect(
       await screen.findByRole("button", {
         name: "Continue training",
@@ -239,6 +237,32 @@ describe("configuration", () => {
   });
 });
 describe("rendering and analytics", () => {
+  it("keeps text mode independent of graphical assets, even when a scene is supplied", () => {
+    const manifest = vi.spyOn(api, "manifest");
+    const scene = capturedScene("snake", "Hoo\n...\n..*");
+    wrap(
+      <SceneView
+        display="text"
+        game="snake"
+        scene={scene}
+        text="Captured text"
+      />,
+    );
+    expect(screen.getByText("Captured text")).toBeInTheDocument();
+    expect(manifest).not.toHaveBeenCalled();
+    expect(document.querySelector("canvas")).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
+  it("treats a text-only game as supported without requesting a manifest", () => {
+    const manifest = vi.spyOn(api, "manifest");
+    wrap(<SceneView game="geometrydash" text="--X-------" />);
+    expect(screen.getByText("--X-------")).toBeInTheDocument();
+    expect(
+      screen.getByText(/This recording has no graphical scene/),
+    ).toBeInTheDocument();
+    expect(manifest).not.toHaveBeenCalled();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("labels inactive telemetry independently of its connected socket", async () => {
     vi.spyOn(stream, "useSpectator").mockReturnValue({
       frames: [],
@@ -247,6 +271,7 @@ describe("rendering and analytics", () => {
     });
     vi.spyOn(api, "replays").mockResolvedValue([]);
     wrap(<Spectator run={completedRun} />);
+    expect(screen.getByLabelText("Display")).toHaveValue("text");
     expect(screen.getByText("Saved frames")).toBeInTheDocument();
     expect(screen.getByLabelText("Mode")).toHaveDisplayValue(
       "Last Training Frames",
