@@ -131,6 +131,8 @@ class GeometryDash:
         self.rng = np.random.default_rng(seed)
         self.length = max(40, min(self.max_steps, self.size * 24))
         self.hazards = {}
+        self.imported_level = None
+        self.import_report = None
         self.portals = {}
         self.pads = {}
         self.orbs = {}
@@ -176,6 +178,7 @@ class GeometryDash:
             self.triggers = {}
             self.length = imported.length
             self.import_report = imported.report()
+            self.imported_level = imported
         self.x = 0.0
         self.y = (self.size - 2) / 2 if self.mode in ("ship", "ufo", "wave", "swing") else 0.0
         self.vy = 0.0
@@ -489,6 +492,12 @@ class GeometryDash:
     def legend():
         """Explain all ASCII symbols in the stable terminal board."""
         return LEGEND
+
+    def render_scene(self):
+        """Capture presentation without advancing physics or consuming RNG."""
+        from .rendering.geometrydash import scene
+
+        return scene(self)
 
     def render(self, color=False, legend=False):
         left = max(0, int(self.x) - 2)

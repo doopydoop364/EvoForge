@@ -6,6 +6,7 @@ Never executes level-provided data or extracts archive members to disk.
 from __future__ import annotations
 
 import base64
+import math
 import plistlib
 import zipfile
 import zlib
@@ -124,12 +125,14 @@ def _entries(text):
         if "1" not in d:
             continue
         try:
-            yield {
+            entry = {
                 "id": int(d["1"]),
                 "x": float(d.get("2", 0)),
                 "y": float(d.get("3", 0)),
                 "raw": d,
             }
+            if all(math.isfinite(entry[k]) and abs(entry[k]) <= 30_000_000 for k in ("x", "y")):
+                yield entry
         except ValueError:
             continue
 

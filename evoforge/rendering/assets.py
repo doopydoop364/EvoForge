@@ -131,6 +131,10 @@ def read_asset(root, asset):
 
 
 def asset_response(game, identifier, digest=None):
+    if game == "geometrydash":
+        from .gd_assets import asset
+
+        return asset(identifier, digest)
     root, manifest = package(game)
     if identifier not in manifest.assets:
         raise KeyError(identifier)
@@ -143,6 +147,10 @@ def asset_response(game, identifier, digest=None):
 
 
 def public_manifest(game):
+    if game == "geometrydash":
+        from .gd_assets import manifest
+
+        return manifest()
     _, manifest = package(game)
     assets = {}
     for identifier in manifest.assets:

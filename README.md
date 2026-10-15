@@ -99,5 +99,5 @@ npm --prefix web run build
 Open http://127.0.0.1:8765. For a fresh machine, follow the full
 [web development setup](docs/web-development.md). See [production and LAN/SSH access](docs/web-deployment.md),
 [security](docs/web-security.md), [render scenes](docs/render-scene.md),
-[asset manifests](docs/asset-manifest.md), [replay format](docs/replay-format.md), and
+[asset manifests](docs/asset-manifest.md), [Geometry Dash spectator](docs/geometrydash-spectator.md), [replay format](docs/replay-format.md), and
 [troubleshooting](docs/web-troubleshooting.md). No public tunnel or automatic deployment is required.

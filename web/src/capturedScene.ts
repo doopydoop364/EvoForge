@@ -1,8 +1,10 @@
 import type { Node, Scene } from "./types";
+import { capturedGeometryScene } from "./geometryScene";
 
 // Older telemetry contains only terminal boards. Present the captured cells;
 // never advance a simulation or invent positions missing from that recording.
 export function capturedScene(game: string, text: string): Scene | undefined {
+  if (game === "geometrydash") return capturedGeometryScene(text);
   if (game !== "snake" && game !== "flappy") return;
   const rows = text.split("\n");
   const size = rows.length;

@@ -307,6 +307,46 @@ describe("rendering and analytics", () => {
     expect(capturedScene("coin", "H.\n.*")).toBeUndefined();
     expect(capturedScene("snake", "H.\n..*")).toBeUndefined();
   });
+  it("renders only recorded Geometry Dash cells, colors, mode symbols and diagnostic portal labels", () => {
+    const board =
+      "-------\n C>OUWR\n SGXov \n =|!   \n       \n.^.....\n### ###";
+    const scene = capturedScene("geometrydash", board)!;
+    expect(scene.nodes.find((n) => n.asset === "cube")).toMatchObject({
+      x: 32,
+      y: 32,
+      color: "#50dcff",
+    });
+    expect(scene.nodes.find((n) => n.asset === "ship")).toMatchObject({
+      x: 64,
+      y: 32,
+    });
+    expect(scene.nodes.find((n) => n.text === "X")?.color).toBe("#ff5c5c");
+    expect(scene.nodes.find((n) => n.text === "|")?.asset).toBeNull();
+    expect(scene.camera).toBeNull();
+    expect(
+      capturedScene(
+        "geometrydash",
+        board.replace("C", "\u001b[38;2;80;220;255mC\u001b[0m"),
+      ),
+    ).toEqual(scene);
+    expect(capturedScene("geometrydash", "not a board")).toBeUndefined();
+  });
+  it("keeps original Geometry Dash artwork optional without drawing substitute sprites", async () => {
+    vi.spyOn(api, "manifest").mockResolvedValue({
+      game: "geometrydash",
+      protocol: 1,
+      assets: {},
+    });
+    const text =
+      "-------\n C     \n       \n       \n       \n.......\n#######";
+    wrap(<SceneView game="geometrydash" text={text} />);
+    expect(
+      await screen.findByText(/Original Geometry Dash artwork is unavailable/),
+    ).toBeInTheDocument();
+    expect(document.querySelector("pre")?.textContent).toBe(text);
+    expect(document.querySelector("canvas")).toBeNull();
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
+  });
   it("makes structured logs readable while preserving plain output and raw JSON", async () => {
     wrap(
       <WorkerLog

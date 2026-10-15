@@ -46,9 +46,21 @@ export function SceneView({
     retry: (attempt, error) =>
       !(error instanceof ApiError && error.status === 404) && attempt < 2,
   });
+  const missingOriginals =
+    game === "geometrydash" &&
+    graphical &&
+    !!manifest.data &&
+    presentation!.nodes.some(
+      (node) =>
+        node.kind === "sprite" &&
+        !!node.asset &&
+        !manifest.data.assets[node.asset],
+    );
   useEffect(() => {
-    if (!graphical || !host.current || !manifest.data) return;
+    if (!graphical || !host.current || !manifest.data || missingOriginals)
+      return;
     const element = host.current;
+    delete element.dataset.sceneReady;
     const app = new Application();
     let stopped = false;
     let ready = false;
@@ -115,6 +127,12 @@ export function SceneView({
           }),
         );
         if (stopped) return;
+        // Geometry Dash never displays invented placeholder artwork.
+        if (
+          game === "geometrydash" &&
+          Object.keys(manifest.data!.assets).some((id) => !textures.has(id))
+        )
+          return;
         app.ticker.add((ticker) => {
           const { scene: current, zoom: zoomNow, fps: fpsNow } = latest.current;
           app.ticker.maxFPS = fpsNow;
@@ -179,8 +197,11 @@ export function SceneView({
               if (entry.display instanceof Sprite) {
                 entry.display.width = node.width;
                 entry.display.height = node.height;
-                entry.display.scale.x *= node.scale_x;
-                entry.display.scale.y *= node.scale_y;
+                entry.display.scale.x =
+                  Math.abs(entry.display.scale.x) * node.scale_x;
+                entry.display.scale.y =
+                  Math.abs(entry.display.scale.y) * node.scale_y;
+                entry.display.tint = node.color;
               } else {
                 entry.display.scale.set(node.scale_x, node.scale_y);
               }
@@ -206,6 +227,7 @@ export function SceneView({
                 sprites.delete(id);
               }
             previous = current;
+            element.dataset.sceneReady = "true";
           }
           const scale = Math.min(
             app.screen.width / current.width,
@@ -233,7 +255,10 @@ export function SceneView({
           app.renderer.background.color = current.background;
           app.renderer.background.alpha = 1;
           for (const { display, node } of sprites.values()) {
-            const t = reduced ? 1 : Math.min(1, ticker.deltaMS / 80);
+            const t =
+              reduced || game === "geometrydash"
+                ? 1
+                : Math.min(1, ticker.deltaMS / 80);
             display.x += (node.x - display.x) * t;
             display.y += (node.y - display.y) * t;
             if (!reduced && node.animation && display instanceof Sprite) {
@@ -255,18 +280,25 @@ export function SceneView({
     void init();
     return () => {
       stopped = true;
+      delete element.dataset.sceneReady;
       if (ready) app.destroy(true, { children: true });
     };
-  }, [game, manifest.data, graphical]);
+  }, [game, manifest.data, graphical, missingOriginals]);
   if (graphical && scene && scene.protocol !== 1)
     return <p role="alert">Unsupported renderer protocol</p>;
   return (
-    <div className="scene-wrap">
+    <div
+      className={`scene-wrap ${game === "geometrydash" ? "geometry-scene" : ""}`}
+    >
       <div
         ref={host}
         className="scene-canvas"
         data-testid="scene-canvas"
-        hidden={!graphical}
+        hidden={
+          !graphical ||
+          missingOriginals ||
+          (game === "geometrydash" && !!assetError)
+        }
       />
       {!graphical && (
         <>
@@ -278,6 +310,18 @@ export function SceneView({
               This recording has no graphical scene. Showing captured text.
             </p>
           )}
+        </>
+      )}
+      {missingOriginals && (
+        <>
+          <p className="scene-caption">
+            Original Geometry Dash artwork is unavailable for this scene.
+            Configure the server&apos;s local game assets and restart it.
+            Showing captured text.
+          </p>
+          <pre className="scene-text">
+            {text || "Captured text is unavailable."}
+          </pre>
         </>
       )}
       {graphical && manifest.error && (
@@ -299,9 +343,18 @@ export function SceneView({
           {text || "Waiting for gameplay frames…"}
         </pre>
       )}
-      {graphical && !scene && presentation && (
-        <p className="scene-caption">Rendered from captured board text.</p>
-      )}
+      {graphical &&
+        !scene &&
+        presentation &&
+        !missingOriginals &&
+        !error &&
+        !assetError && (
+          <p className="scene-caption">
+            Rendered from captured board text.
+            {game === "geometrydash" &&
+              " Mode modifiers and portal types were not recorded."}
+          </p>
+        )}
       {graphical && assetError && presentation && !error && (
         <pre>{text || "Captured text is unavailable."}</pre>
       )}
