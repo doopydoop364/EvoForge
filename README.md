@@ -1,60 +1,79 @@
-# EvoForge v0.9.0
+# EvoForge 1.0.0-rc.1
 
-EvoForge is a local neuroevolution and PPO experiment runner with a Textual terminal control center.
+EvoForge trains discrete game agents with evolution, PPO, or hybrid learning.
+Install a trusted game plugin, configure an experiment in the Textual SSH UI,
+start a detached worker, watch sampled real gameplay, reconnect from another
+client, compare interaction budgets, and recover from committed checkpoints.
 
-## v0.9.0
+This is a **release candidate**. Cloud checks and operator acceptance are tracked
+in [release validation](docs/RELEASE.md). No stable tag or release is published.
 
-### Implemented
+## Quick start (Linux, bash or fish)
 
-- **Live worker spectating:** the Textual Spectator tab watches `spectator.pt` as the trainer atomically publishes a fresh top-policy sample each generation. Existing champion and replay behavior remains available.
-- **Richer analytics:** each new generation records median and standard deviation of fitness, best-to-mean gap, and a population score-spread indicator in `metrics.csv`; the new `RunService` exposes a UI-independent JSON-friendly snapshot and trend summary.
-- **SSH disconnect resilience:** both terminal frontends launch training in a separate process session, write output to `training.log`, and training records its PID/state/generation to `worker.json`. A generation checkpoint is written before the worker reports completion.
-- **Checkpoint recovery:** each checkpoint replacement retains the prior checkpoint as `checkpoint.pt.bak`; resume falls back to it if the current checkpoint cannot be read. This can lose the most recent completed generation, but preserves earlier progress.
-- **Compatibility:** existing `checkpoint.pt`, `champion.pt`, `spectator.pt`, and older `metrics.csv` files remain readable. New metric columns are appended for newly trained generations.
-- **Theme persistence:** retained from v0.8.4.
-
-### Incomplete / limitations
-
-- Live snapshots are sampled at generation boundaries, not streamed per episode or step.
-- The UI that started a worker can pause/stop it. Reconnecting to a new UI can inspect `worker.json` and logs, but does not yet attach controls to or safely stop that pre-existing worker.
-- Worker status can show `stale` after a crash or host reboot; resume from the last valid checkpoint to continue.
-- Recovery keeps one previous checkpoint only. Corruption of both checkpoint files requires an external backup.
-- `population_diversity` is a score-spread proxy, not a genotype-distance measure.
-- The service module is an in-process API foundation; no HTTP server or web frontend is included.
-
-## Install or migrate on the SSH host (fish shell)
-
-On your Mac, copy the archive to the host:
-
-```fish
-scp ~/Downloads/EvoForge-v0.9.0.zip iuselinuxbtw@10.0.0.242:~/
-ssh iuselinuxbtw@10.0.0.242
+```sh
+python3 -m venv .venv
+.venv/bin/python -m pip install torch --index-url https://download.pytorch.org/whl/cpu
+.venv/bin/python -m pip install -e '.[dev,tui,api]'
+.venv/bin/python -m pip install -e examples/coin-game
+.venv/bin/evoforge doctor
+.venv/bin/evoforge games validate coin
+.venv/bin/evoforge tui --output runs/first
 ```
 
-On the host, save a copy of the current project and unpack v0.9.0:
+In Experiments, create a named run. In Settings, choose Coin, training mode and
+population, enter optional hidden widths and plugin JSON, then Validate & Save.
+Use Overview to start/pause/resume/stop. Live Training shows actual sampled worker
+frames. Champion and Population modes are independent replays with adjustable
+speed/focus/density. Closing the UI leaves workers running; reopen the same run
+to reconnect. The library supports duplicate/rename/archive, analytics export and
+matched environment-step comparisons.
 
-```fish
-cd ~/EvoForge
-cp -a . ../EvoForge-v0.8.4-backup
-unzip ~/EvoForge-v0.9.0.zip -d /tmp/evoforge-v090
-cp -a /tmp/evoforge-v090/EvoForge-v0.9.0/. ~/EvoForge/
-.venv/bin/python -m pip install -e '.[dev,tui]'
-.venv/bin/python -m pytest -q
+Small headless run:
+
+```sh
+.venv/bin/evoforge train --game coin --mode evolution --population 4 --elites 1 --ppo-candidates 0 --generations 3 --hidden-widths 16,8 --output runs/coin-demo
+.venv/bin/evoforge experiments inspect coin-demo --root runs
+.venv/bin/evoforge experiments export coin-demo --root runs --format csv
 ```
 
-The package install may need network access if dependencies are not already present. The archive does not contain or overwrite `runs/`; keep that directory in place for run migration.
+Use `--background` to return immediately. Use `--resume` with the same output to
+resume or extend a run; only generation targets may change. All CLI/TUI/API
+worker controls use the same local supervisor and reject duplicate workers.
 
-Start the existing run in the Textual app:
+## Commands
 
-```fish
-.venv/bin/evoforge tui --output runs/snake-500
+```text
+evoforge                         interactive TUI, headless help otherwise
+evoforge tui --output runs/demo
+evoforge dashboard               standard-library terminal fallback
+evoforge games list|inspect|validate [GAME_ID]
+evoforge experiments list|create|inspect|compare|duplicate|rename|archive|unarchive|export
+evoforge train --game GAME --mode evolution|ppo|hybrid --output runs/demo
+evoforge workers list|status|start|recover|pause|resume|stop [ID] --root runs
+evoforge api serve --root runs    localhost:8765; remote binding requires token
+evoforge migrate CHECKPOINT      dry-run; --apply preserves original backup
+evoforge play CHAMPION --fps 7
+evoforge baseline GAME --heuristic
+evoforge doctor --root runs
+evoforge version
 ```
 
-Or resume from a shell and let it continue after SSH disconnect:
+Each command supports `--help`. Existing Snake/Flappy configs, CSV histories and
+compatible v0.9 checkpoints remain readable. New archives use an integrity header
+and restricted tensor loading, so external scripts must use `safe_load` rather
+than calling `torch.load` directly. Never overwrite your historical run folder
+when upgrading; see [migration](docs/training.md#checkpoint-schema-1).
 
-```fish
-nohup .venv/bin/evoforge train --output runs/snake-500 --resume > runs/snake-500/training.log 2>&1 < /dev/null &
-disown
-```
+## Documentation
 
-The Textual and classic dashboard Start actions already create a separate worker session and save logs to the run folder. Use `tail -f runs/snake-500/training.log` to inspect output after reconnecting. Training checkpoints are saved at completed generation boundaries; stopping mid-generation resumes from the prior checkpoint.
+- [Installation, CachyOS, fish, SSH and GTX 1070](docs/installation.md)
+- [Game SDK and complete external example](docs/sdk.md)
+- [Algorithms, configuration and checkpoint migration](docs/training.md)
+- [Supervisor and systemd administration](docs/supervisor.md)
+- [Telemetry and spectator protocol](docs/telemetry.md)
+- [REST/WebSocket API and authentication](docs/api.md)
+- [Textual controls and analytics](docs/tui.md)
+- [Architecture, security and troubleshooting](docs/operations.md)
+- [Contributing and testing](CONTRIBUTING.md)
+- [Release readiness and unverified scenarios](docs/RELEASE.md)
+- [Audit and incremental implementation progress](docs/PROGRESS.md)

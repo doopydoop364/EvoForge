@@ -1,2 +1,3 @@
-"""EvoForge hybrid training research prototype."""
-__version__ = "0.8.4"
+"""EvoForge universal game learning platform."""
+
+__version__ = "1.0.0rc1"

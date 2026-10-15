@@ -1,0 +1,15 @@
+[Unit]
+Description=EvoForge local training supervisor API
+After=network.target
+
+[Service]
+Type=simple
+WorkingDirectory=%h/EvoForge
+EnvironmentFile=%h/.config/evoforge/api.env
+ExecStart=%h/EvoForge/.venv/bin/evoforge api serve --root %h/EvoForge/runs --host 127.0.0.1
+Restart=on-failure
+KillMode=process
+UMask=0077
+
+[Install]
+WantedBy=default.target

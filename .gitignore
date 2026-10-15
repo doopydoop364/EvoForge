@@ -5,3 +5,10 @@ __pycache__/
 runs/
 *.pt
 *.log
+
+*.egg-info/
+build/
+dist/
+.ruff_cache/
+*.sqlite*
+*.tmp

@@ -7,7 +7,9 @@ from evoforge.trainer import Config, Trainer
 
 def test_run_service_snapshot_reads_legacy_and_current_run_files(tmp_path):
     (tmp_path / "config.json").write_text(json.dumps({"game": "snake"}))
-    (tmp_path / "worker.json").write_text(json.dumps({"state": "running", "pid": os.getpid(), "generation": 3}))
+    (tmp_path / "worker.json").write_text(
+        json.dumps({"state": "running", "pid": os.getpid(), "generation": 3})
+    )
     (tmp_path / "metrics.csv").write_text("generation,best_train,mean_train\n0,1.5,1\n1,3,2\n")
     (tmp_path / "checkpoint.pt").touch()
     snap = RunService(tmp_path).snapshot()
@@ -39,12 +41,27 @@ def test_metric_append_expands_legacy_csv_header_without_shifting_rows(tmp_path)
 
 
 def test_trainer_recovers_previous_checkpoint_when_latest_is_corrupt(tmp_path):
-    config = Config(population=2, elites=1, generations=2, eval_episodes=1, ppo_episodes=1, ppo_candidates=0)
+    config = Config(
+        population=2, elites=1, generations=2, eval_episodes=1, ppo_episodes=1, ppo_candidates=0
+    )
     trainer = Trainer(config, tmp_path)
     trainer._save()
     trainer.generation = 1
     trainer._save()
     trainer.checkpoint.write_bytes(b"partial checkpoint")
-    recovered = Trainer(Config(population=2, elites=1, generations=2, eval_episodes=1, ppo_episodes=1, ppo_candidates=0), tmp_path, resume=True)
+    recovered = Trainer(
+        Config(
+            population=2, elites=1, generations=2, eval_episodes=1, ppo_episodes=1, ppo_candidates=0
+        ),
+        tmp_path,
+        resume=True,
+    )
     assert recovered.generation == 0
     assert recovered.checkpoint_recovered is True
+
+
+def test_metrics_scientific_notation_and_incomplete_legacy_rows(tmp_path):
+    (tmp_path / "metrics.csv").write_text("generation,best_train,mean_train\n0,1e-05\n")
+    row = read_metrics(tmp_path)[0]
+    assert row["best_train"] == 0.00001
+    assert row["mean_train"] is None
