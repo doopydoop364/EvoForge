@@ -6,7 +6,16 @@ from evoforge.agents import policy_for
 from evoforge.algorithms import crossover
 from evoforge.games import make_env
 from evoforge.sdk import GameInfo, GamePlugin, register, validate_game
-from evoforge.sdk.registry import discover
+from evoforge.sdk.registry import PLUGINS, discover
+
+
+@pytest.fixture(autouse=True)
+def restore_plugin_registry():
+    # Invalid test plugins must not leak into later API game discovery tests.
+    before = discover().copy()
+    yield
+    PLUGINS.clear()
+    PLUGINS.update(before)
 
 
 class WideGame(GamePlugin):

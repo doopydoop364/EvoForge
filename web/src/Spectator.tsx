@@ -366,6 +366,28 @@ export function Spectator({ run }: { run?: Experiment }) {
           Simulation runs independently of playback speed.
         </p>
       </section>
+      {run.config.game === "geometrydash" && (
+        <details className="panel geometry-legend">
+          <summary>Geometry Dash symbols, colors and limitations</summary>
+          <p>
+            C cube · &gt; ship · O ball · U UFO · W wave · R robot · S spider ·
+            G swing · X collision.
+          </p>
+          <p>
+            Cyan player · red hazards/death · yellow orbs · green pads · purple
+            portals · orange trigger labels.
+          </p>
+          <p>
+            Graphics use original sprites from the server&apos;s local game
+            installation. Player icons are static base sprites; robot and spider
+            show their body sprites. Dual is a state flag, with one simulated
+            player. Imported levels show a 2D reference; physics still use a
+            lossy column projection. Unknown objects are labeled by ID. Original
+            color channels, custom triggers and camera effects are not
+            reproduced.
+          </p>
+        </details>
+      )}
       {mode === "live" ? (
         <div className={`agent-grid ${focused ? "focus-grid" : ""}`}>
           {frames.length ? (

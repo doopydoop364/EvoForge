@@ -5,8 +5,8 @@ import time
 
 def manifest(game):
     if game == "geometrydash":
-        # This simulator provides terminal frames. A missing graphical layer is
-        # a supported capability, not a missing-asset error.
+        # Original GD artwork is discovered from the local game installation
+        # by rendering.assets; it is never part of the bundled asset package.
         return {"protocol": 1, "assets": {}}
     if game == "snake":
         paths = {

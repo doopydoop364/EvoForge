@@ -56,11 +56,16 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
   await expect(
     page.getByRole("heading", { name: "Flappy-style" }),
   ).toBeVisible();
-  await expect(page.locator("canvas")).toHaveCount(3);
+  const gdManifest = await (
+    await page.request.get("/api/v1/games/geometrydash/manifest")
+  ).json();
+  await expect(page.locator("canvas")).toHaveCount(
+    gdManifest.assets.cube ? 4 : 3,
+  );
   // A canvas alone also passes when every sprite is a placeholder. Verify the
   // extensionless assets actually reached the image loaders for all plugins.
   const manifests = await Promise.all(
-    ["snake", "flappy", "coin"].map(async (game) =>
+    ["snake", "flappy", "coin", "geometrydash"].map(async (game) =>
       (await page.request.get(`/api/v1/games/${game}/manifest`)).json(),
     ),
   );
@@ -69,6 +74,9 @@ test("complete Coin lifecycle, actual frames, analytics, saved and model replays
     0,
   );
   await expect.poll(() => loadedAssets.size).toBe(expectedAssets);
+  await expect(
+    page.locator(".scene-canvas[data-scene-ready=true]"),
+  ).toHaveCount(gdManifest.assets.cube ? 4 : 3);
   expect(renderWarnings).toEqual([]);
   await expect(page.locator(".scene-warning")).toHaveCount(0);
   await page.screenshot({
@@ -312,7 +320,7 @@ test("failed game assets produce a visible warning and captured text", async ({
   await expect(snake.locator("pre")).toContainText("H");
 });
 
-test("saved Geometry Dash frames stay text-only without asset requests", async ({
+test("saved Geometry Dash text frames use original artwork only when graphics is selected", async ({
   page,
 }) => {
   await login(page);
@@ -333,16 +341,112 @@ test("saved Geometry Dash frames stay text-only without asset requests", async (
   await expect(page.getByRole("alert")).toHaveCount(0);
   expect(assetRequests).toEqual([]);
   await page.getByLabel("Display", { exact: true }).selectOption("graphics");
-  await expect(
-    page.getByText(
-      "This recording has no graphical scene. Showing captured text.",
-    ),
-  ).toBeVisible();
+  const manifest = await (
+    await page.request.get("/api/v1/games/geometrydash/manifest")
+  ).json();
+  if (manifest.assets.ground) {
+    await expect(page.locator("canvas")).toHaveCount(1);
+    await expect(
+      page.getByText(/Mode modifiers and portal types were not recorded/),
+    ).toBeVisible();
+  } else {
+    await expect(
+      page.getByText(/Original Geometry Dash artwork is unavailable/),
+    ).toBeVisible();
+    await expect(page.locator("canvas")).toHaveCount(0);
+  }
   await expect(page.getByRole("alert")).toHaveCount(0);
-  expect(assetRequests).toEqual([]);
+  expect(assetRequests.length).toBeGreaterThan(0);
   await page.getByLabel("Display", { exact: true }).selectOption("text");
   await page.screenshot({
     path: "test-results/geometrydash-text.png",
     fullPage: true,
   });
+});
+
+test("Geometry Dash actual worker telemetry, saved episodes, champion and population graphics", async ({
+  page,
+}) => {
+  await login(page);
+  const created = await page.request.post("/api/v1/experiments", {
+    data: {
+      id: "browser-geometry",
+      config: {
+        game: "geometrydash",
+        mode: "evolution",
+        generations: 10000,
+        population: 4,
+        elites: 1,
+        ppo_candidates: 0,
+        eval_episodes: 1,
+        hidden: [8],
+        max_steps: 40,
+      },
+    },
+  });
+  expect(created.ok()).toBe(true);
+  await page.request.post("/api/v1/experiments/browser-geometry/start");
+  await page.reload();
+  await page
+    .getByLabel("Open experiment", { exact: true })
+    .selectOption("browser-geometry");
+  await nav(page, "Spectator");
+  await expect(
+    page.getByText("Live sampled frames", { exact: true }),
+  ).toBeVisible();
+  await page.getByLabel("Visible agents").selectOption("1");
+  await page.getByLabel("Display", { exact: true }).selectOption("graphics");
+  const manifest = await (
+    await page.request.get("/api/v1/games/geometrydash/manifest")
+  ).json();
+  if (manifest.assets.cube) {
+    await expect(page.locator("canvas")).toHaveCount(1);
+    await expect(
+      page.locator(".scene-canvas[data-scene-ready=true]"),
+    ).toHaveCount(1);
+    await expect(page.locator(".scene-warning")).toHaveCount(0);
+    await page.screenshot({
+      path: "test-results/geometrydash-live.png",
+      fullPage: true,
+    });
+  } else {
+    await expect(
+      page.getByText(/Original Geometry Dash artwork is unavailable/),
+    ).toBeVisible();
+  }
+  await page.request.post("/api/v1/experiments/browser-geometry/stop");
+  await expect(page.getByText("Saved frames", { exact: true })).toBeVisible();
+  await page.getByLabel("Mode", { exact: true }).selectOption("recorded");
+  await expect
+    .poll(() => page.getByLabel("Saved episode").locator("option").count())
+    .toBeGreaterThan(1);
+  await page.getByLabel("Saved episode").selectOption({ index: 1 });
+  await expect(
+    page.getByRole("button", { name: "Play replay", exact: true }),
+  ).toBeVisible();
+  if (manifest.assets.cube) await expect(page.locator("canvas")).toHaveCount(1);
+  await page.getByLabel("Mode", { exact: true }).selectOption("champion");
+  await page.getByLabel("Replay seed").fill("321");
+  await page.getByRole("button", { name: "Load replay", exact: true }).click();
+  await expect(page.getByText("· seed 321")).toBeVisible();
+  await page.getByRole("slider").fill("1");
+  await page.getByRole("button", { name: "Play replay", exact: true }).click();
+  if (manifest.assets.cube) {
+    await expect(page.locator("canvas")).toHaveCount(1);
+    await expect(
+      page.locator(".scene-canvas[data-scene-ready=true]"),
+    ).toHaveCount(1);
+  }
+  await page.screenshot({
+    path: "test-results/geometrydash-replay.png",
+    fullPage: true,
+  });
+  await page.getByLabel("Mode", { exact: true }).selectOption("population");
+  await page.getByLabel("Visible agents").selectOption("2");
+  await page.getByRole("button", { name: "Load replay", exact: true }).click();
+  await expect(
+    page.getByRole("button", { name: "Play replay", exact: true }),
+  ).toHaveCount(2);
+  if (manifest.assets.cube) await expect(page.locator("canvas")).toHaveCount(2);
+  await expect(page.getByRole("alert")).toHaveCount(0);
 });

@@ -12,7 +12,7 @@ from evoforge.rendering.schema import Asset, Scene, validate_scene
 from evoforge.telemetry.recordings import EpisodeRecorder, Recording, ReplayStore
 
 
-@pytest.mark.parametrize("game", ["snake", "flappy", "coin"])
+@pytest.mark.parametrize("game", ["snake", "flappy", "coin", "geometrydash"])
 def test_scene_assets_and_simulation_are_independent(game):
     left, right = make_env(game), make_env(game)
     try:
@@ -361,16 +361,17 @@ def test_flappy_scene_uses_whole_pipes_and_original_bird_aspect():
         close_env(env)
 
 
-def test_geometrydash_is_registered_and_text_only(tmp_path):
+def test_geometrydash_is_registered_with_optional_original_artwork(tmp_path, monkeypatch):
     from evoforge.games import available_games, game_spec
 
     assert "geometrydash" in available_games()
     assert game_spec("geometrydash").observation_size == 17
+    monkeypatch.setenv("EVOFORGE_GD_RESOURCES", str(tmp_path / "missing"))
     env = make_env("geometrydash", max_steps=50)
     try:
         env.reset(42)
         data = frame(env)
-        assert "scene" not in data and len(data["text"].splitlines()) == env.size
+        assert data["scene"]["nodes"] and len(data["text"].splitlines()) == env.size
         assert "render_error" not in data
     finally:
         close_env(env)
@@ -380,7 +381,7 @@ def test_geometrydash_is_registered_and_text_only(tmp_path):
         assert response.status_code == 200 and response.json()["assets"] == {}
         preview = client.get("/api/v1/games/geometrydash/scene")
         assert preview.status_code == 200 and "text" in preview.json()
-        assert "scene" not in preview.json()
+        assert preview.json()["scene"]["nodes"]
 
 
 def test_plugins_can_supply_an_independent_graphical_scene_and_hud(tmp_path):

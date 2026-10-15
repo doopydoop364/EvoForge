@@ -10,9 +10,10 @@ requested. It must not mutate simulation state. Invalid scenes produce an explic
 The spectator opens in **Text** mode for both sampled frames and replays. Text
 mode never requests an asset manifest or starts a graphics renderer. Users can
 select **Display → Game graphics** to view the game's optional presentation.
-A text-only game (including the Geometry Dash-style simulator) does not need
-assets; selecting graphics for a recording without a scene keeps its captured
+A text-only game does not need assets; selecting graphics for a recording without a scene keeps its captured
 text visible with an explanation rather than reporting an asset failure.
+Geometry Dash now captures graphical scenes and can render old board samples with
+[original sprites from a local installation](geometrydash-spectator.md).
 
 Plugins can provide their own graphical spectator through `render_scene()` and
 `get_asset_manifest()`: sprites, tilemaps, custom shapes, animations, camera
