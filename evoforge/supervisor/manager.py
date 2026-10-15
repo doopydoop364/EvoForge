@@ -49,6 +49,8 @@ class Supervisor:
             raise WorkerConflict("Experiment already exists") from exc
         atomic_json(path / "config.json", asdict(cfg))
         self.register(experiment)
+        with self.database.connect() as db:
+            self.database.event(db, experiment, "created", {})
         return self.inspect(experiment)
 
     def register(self, experiment):

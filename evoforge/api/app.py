@@ -1,9 +1,14 @@
 """Versioned local API. All experiment mutations use the shared supervisor."""
 
 import asyncio
+import hashlib
 import hmac
 import os
+import secrets
+import time
+from pathlib import Path
 from typing import Literal
+from urllib.parse import urlsplit
 
 from fastapi import (
     APIRouter,
@@ -11,6 +16,7 @@ from fastapi import (
     FastAPI,
     HTTPException,
     Query,
+    Request,
     WebSocket,
     WebSocketDisconnect,
 )
@@ -35,7 +41,34 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
     manager = Supervisor(root)
     security = HTTPBearer(auto_error=False)
 
-    def authenticated(credentials: HTTPAuthorizationCredentials | None = Depends(security)):
+    session_key = secrets.token_bytes(32)
+    allowed_origins = set(filter(None, os.environ.get("EVOFORGE_ALLOWED_ORIGINS", "").split(",")))
+
+    def origin_allowed(connection):
+        origin = connection.headers.get("origin")
+        if not origin:
+            return True
+        parsed = urlsplit(origin)
+        return origin in allowed_origins or (
+            parsed.scheme in {"http", "https"} and parsed.netloc == connection.headers.get("host")
+        )
+
+    def valid_cookie(connection):
+        value = connection.cookies.get("evoforge_session", "")
+        try:
+            expiry, signature = value.split(".")
+            expected = hmac.new(session_key, expiry.encode(), hashlib.sha256).hexdigest()
+            return int(expiry) > time.time() and hmac.compare_digest(signature, expected)
+        except (ValueError, TypeError):
+            return False
+
+    def authenticated(
+        request: Request, credentials: HTTPAuthorizationCredentials | None = Depends(security)
+    ):
+        if not origin_allowed(request):
+            raise HTTPException(403, "Origin not allowed")
+        if token and valid_cookie(request):
+            return
         if token and (
             not credentials
             or credentials.scheme.lower() != "bearer"
@@ -46,6 +79,19 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
             )
 
     app = FastAPI(title="EvoForge API", version=__version__)
+    from starlette.middleware.trustedhost import TrustedHostMiddleware
+
+    from .web import RequestLimits
+
+    app.add_middleware(RequestLimits)
+    hosts = list(
+        LOCAL_HOSTS
+        | {"testserver"}
+        | set(filter(None, os.environ.get("EVOFORGE_ALLOWED_HOSTS", "").split(",")))
+    )
+    if "*" in hosts or "*" in allowed_origins:
+        raise ValueError("Wildcard browser hosts/origins are not supported")
+    app.add_middleware(TrustedHostMiddleware, allowed_hosts=hosts)
     router = APIRouter(dependencies=[Depends(authenticated)])
     app.state.supervisor = manager
 
@@ -191,10 +237,38 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
     def workers():
         return manager.workers()
 
+    @router.post("/api/v1/session")
+    def session(request: Request):
+        expiry = str(int(time.time()) + 8 * 3600)
+        signature = hmac.new(session_key, expiry.encode(), hashlib.sha256).hexdigest()
+        response = JSONResponse({"authenticated": True})
+        response.set_cookie(
+            "evoforge_session",
+            f"{expiry}.{signature}",
+            httponly=True,
+            secure=request.url.scheme == "https",
+            samesite="strict",
+            max_age=8 * 3600,
+            path="/api",
+        )
+        return response
+
+    @router.delete("/api/v1/session")
+    def logout():
+        response = JSONResponse({"authenticated": False})
+        response.delete_cookie("evoforge_session", path="/api")
+        return response
+
+    from .web import install_routes
+
+    install_routes(router, manager)
     app.include_router(router)
 
     async def stream(websocket, experiment, since):
-        if token:
+        if not origin_allowed(websocket):
+            await websocket.close(code=4403)
+            return
+        if token and not valid_cookie(websocket):
             header = websocket.headers.get("authorization", "")
             if not hmac.compare_digest(header, f"Bearer {token}"):
                 await websocket.close(code=4401)
@@ -214,7 +288,11 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
 
                     path = manager.path(experiment)
                     frames = await asyncio.to_thread(
-                        lambda path=path, after=cursor: FrameChannel(path).read(after)
+                        lambda path=path, after=cursor: (
+                            FrameChannel.read_existing(path, after)
+                            if (path / "telemetry.sqlite").exists()
+                            else []
+                        )
                     )
                     key = "frames"
                 else:
@@ -241,5 +319,13 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
     @app.websocket("/api/v1/experiments/{experiment}/spectator", dependencies=[])
     async def spectator(websocket: WebSocket, experiment: str, since: int = Query(0, ge=0)):
         await stream(websocket, experiment, since)
+
+    static_root = Path(
+        os.environ.get("EVOFORGE_WEB_DIR", Path(__file__).resolve().parents[2] / "web" / "dist")
+    )
+    if (static_root / "index.html").is_file():
+        from fastapi.staticfiles import StaticFiles
+
+        app.mount("/", StaticFiles(directory=static_root, html=True), name="web")
 
     return app
