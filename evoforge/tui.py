@@ -99,7 +99,7 @@ class EvoForgeApp(App):
     .field { height: 3; margin-bottom: 1; }
     .field Label { width: 23; padding-top: 1; }
     .field Input, .field Select { width: 1fr; }
-    #experiments { height: 1fr; }
+    #experiments { height: 1fr; min-height: 5; }
     #logs { height: 1fr; border: round #39705f; }
     #board { height: 1fr; min-height: 14; color: #b7f7c9; overflow: auto; }
     #agent-board { height: 1fr; min-height: 12; color: #b7f7c9; overflow: auto; }
@@ -178,7 +178,7 @@ class EvoForgeApp(App):
                     yield Button("Create run", id="new-run", variant="primary")
                 yield DataTable(id="experiments", cursor_type="row")
                 yield Static(
-                    "Select a row and click Open; experiments are kept in separate directories."
+                    "Select a row; enter a destination above for Duplicate / Rename. Archive toggles Unarchive."
                 )
                 with ResponsiveActions(classes="actions"):
                     yield Button("Open selected", id="open-run", variant="success")
@@ -329,6 +329,7 @@ class EvoForgeApp(App):
         if not (self.directory / "config.json").exists():
             atomic_json(self.directory / "config.json", _settings_defaults())
         self.manager.register(self.directory.name)
+        self._selected_experiment = self.directory
         self.last_log = ""
         self.query_one("#logs", Log).clear()
         self._load_settings()
@@ -342,6 +343,14 @@ class EvoForgeApp(App):
     def _list_runs(self):
         table = self.query_one("#experiments", DataTable)
         selected = self._selected_experiment
+        # Rebuilding emits transient highlights for the first row. Only the final
+        # cursor may change selection; delayed messages are checked below too.
+        with table.prevent(DataTable.RowHighlighted, DataTable.RowSelected):
+            self._populate_runs(table, selected)
+        self._selected_experiment = self._selected_run()
+        self._update_archive_action()
+
+    def _populate_runs(self, table, selected):
         table.clear()
         row_to_select = None
         for directory in sorted(self._root().iterdir()):
@@ -761,22 +770,33 @@ class EvoForgeApp(App):
         self._close_replay()
 
     @on(DataTable.RowSelected, "#experiments")
+    @on(DataTable.RowHighlighted, "#experiments")
     def _experiment_row_selected(self, event):
-        self._selected_experiment = Path(str(event.row_key.value)).resolve()
-        self.notify_status(f"Selected {self._selected_experiment.name}")
+        selected = self._selected_run()
+        if selected is None or selected != Path(str(event.row_key.value)).resolve():
+            return
+        self._update_archive_action()
+        if isinstance(event, DataTable.RowSelected):
+            self.notify_status(f"Selected {selected.name}")
 
     def _selected_run(self):
         table = self.query_one("#experiments", DataTable)
-        if table.row_count == 0 or table.cursor_row is None:
-            return (
-                self._selected_experiment
-                if self._selected_experiment and self._selected_experiment.exists()
-                else None
-            )
-        name = str(table.get_row_at(table.cursor_row)[0])
-        path = (self._root() / name).resolve()
+        if not 0 <= table.cursor_row < table.row_count:
+            self._selected_experiment = None
+            return None
+        # Stable row identity, rather than display text or the currently open run.
+        row_key = table.coordinate_to_cell_key(table.cursor_coordinate).row_key
+        path = Path(str(row_key.value)).resolve()
         self._selected_experiment = path
         return path
+
+    def _update_archive_action(self):
+        table = self.query_one("#experiments", DataTable)
+        archived = (
+            0 <= table.cursor_row < table.row_count
+            and table.get_row_at(table.cursor_row)[4] == "Archived"
+        )
+        self.query_one("#archive-run", Button).label = "Unarchive" if archived else "Archive"
 
     def _manage_run(self, kind):
         path = self._selected_run()
@@ -790,13 +810,15 @@ class EvoForgeApp(App):
                 target = self.manager.path(result["id"])
                 if kind == "rename" and path == self.directory:
                     self.directory = target
+                    self._refresh()
                 self._selected_experiment = target
             else:
                 row = self.manager.inspect(path.name)
                 self.manager.archive(path.name, not row["archived"])
+                kind = "unarchive" if row["archived"] else "archive"
             self._list_runs()
-            self.notify_status(f"{kind.title()} successful")
-        except (OSError, ValueError, KeyError) as exc:
+            self.notify_status(f"{kind.title()} successful: {self._selected_experiment.name}")
+        except (OSError, ValueError, KeyError, sqlite3.Error) as exc:
             self.notify_status(f"{kind.title()} failed: {exc}")
 
     def _resources(self):

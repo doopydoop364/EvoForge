@@ -25,6 +25,17 @@ Checkpointed settings are protected; use Extend +100 or duplicate into a fresh
 run. Rename/archive require a stopped worker. Duplicate copies configuration,
 never checkpoints, metrics or worker identity.
 
+Library actions apply to the highlighted row, which is preserved across Refresh
+and Ctrl+R. Opening a run highlights that run; Duplicate and Rename highlight
+their destination. Duplicate leaves the currently open run unchanged. Enter a
+new, unused run name in the full-width name field before Duplicate or Rename.
+Archive keeps all saved files and changes the button to Unarchive; click it again
+to restore the run. Rename/archive are allowed for created, stopped, completed
+or failed runs, and report a conflict while a worker is active or holds its lock.
+Pause alone does not release the worker. Errors appear in the bottom status line.
+On short terminals the library keeps a usable table height; scroll or use Tab to
+reach the action buttons below it.
+
 Overview Start connects to the shared supervisor; a duplicate start reports a
 conflict. Pause/Continue and Stop are requests, with acknowledged state visible
 in Overview and Workers. Closing the app does not stop training. Reopen the same

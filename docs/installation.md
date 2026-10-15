@@ -67,3 +67,23 @@ apply repeatedly. New-format writing preserves the previous valid archive.
 Resume allows a larger generation target but rejects incompatible game versions,
 network architecture or training settings. Review `docs/training.md` for legacy
 counter limitations and checksum behavior.
+
+## Test the v1.0 experiment-action fix before merge
+
+In an existing Git clone, stop workers before renaming/archiving experiments and
+back up the entire runs root, including its hidden `.evoforge.sqlite` metadata.
+Close the old TUI, then install the bugfix branch in the same virtual environment:
+
+```sh
+git fetch origin
+git switch bugfix/v1.0-experiment-actions
+git pull --ff-only origin bugfix/v1.0-experiment-actions
+.venv/bin/python -m pip install -e '.[tui,api]'
+.venv/bin/evoforge tui --output /absolute/path/to/existing/runs/EXPERIMENT
+```
+
+Replace the final path with an existing experiment directory, keeping the same
+runs root used previously. The commands work in fish without activation. No
+experiment migration, reset or deletion is needed for this fix. This branch is
+a review build, not a merged release. After the PR is approved and merged, use
+`feature/v1.0-universal-core` instead of the bugfix branch in the commands above.
