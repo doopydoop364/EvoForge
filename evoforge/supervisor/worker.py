@@ -146,6 +146,7 @@ def run_worker(root, experiment, identity, lock_fd):
         finish.set()
         thread.join(timeout=6)
         with database.connect() as db:
+            db.execute("BEGIN IMMEDIATE")
             current = db.execute(
                 "SELECT status FROM experiments WHERE id=?", (experiment,)
             ).fetchone()["status"]
@@ -158,18 +159,20 @@ def run_worker(root, experiment, identity, lock_fd):
                 "UPDATE workers SET heartbeat=?,generation=? WHERE experiment=? AND identity=?",
                 (time.time(), trainer.generation if trainer else 0, experiment, identity),
             )
-        atomic_json(
-            path / "worker.json",
-            {
-                "pid": os.getpid(),
-                "identity": identity,
-                "incarnation": incarnation(os.getpid()),
-                "state": final.lower(),
-                "generation": trainer.generation if trainer else 0,
-                "updated_at": time.time(),
-            },
-        )
-        os.close(lock_fd)
+            atomic_json(
+                path / "worker.json",
+                {
+                    "pid": os.getpid(),
+                    "identity": identity,
+                    "incarnation": incarnation(os.getpid()),
+                    "state": final.lower(),
+                    "generation": trainer.generation if trainer else 0,
+                    "updated_at": time.time(),
+                },
+            )
+            # Publish terminal status only after file writes and lock release. A
+            # new owner can acquire the lock but must wait for this transaction.
+            os.close(lock_fd)
     return 0 if final != "FAILED" else 1
 
 

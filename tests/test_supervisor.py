@@ -185,6 +185,35 @@ def test_stop_during_worker_startup_is_graceful(tmp_path):
 pytestmark = pytest.mark.integration
 
 
+def test_terminal_status_is_published_after_worker_lock_release(tmp_path, monkeypatch):
+    from evoforge.supervisor import worker
+
+    manager = Supervisor(tmp_path)
+    config = long_config()
+    config.generations = 1
+    manager.create("ordering", config)
+    fd = os.open(tmp_path / "ordering" / ".worker.lock", os.O_CREAT | os.O_RDWR, 0o600)
+    identity = manager._claim("ordering", fd)
+    original_close = os.close
+    observed = []
+
+    def close(descriptor):
+        if descriptor == fd:
+            with manager.database.connect() as db:
+                status = db.execute(
+                    "SELECT status FROM experiments WHERE id='ordering'"
+                ).fetchone()["status"]
+            metadata = json.loads((tmp_path / "ordering" / "worker.json").read_text())
+            observed.append((status, metadata["state"]))
+        return original_close(descriptor)
+
+    monkeypatch.setattr(worker.signal, "signal", lambda *_: None)
+    monkeypatch.setattr(worker.os, "close", close)
+    assert worker.run_worker(tmp_path, "ordering", identity, fd) == 0
+    assert observed == [("RUNNING", "completed")]
+    assert manager.inspect("ordering")["status"] == "COMPLETED"
+
+
 def test_historical_metadata_inspectable_when_plugin_uninstalled(tmp_path):
     manager = Supervisor(tmp_path)
     path = tmp_path / "historic"
