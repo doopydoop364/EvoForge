@@ -262,6 +262,9 @@ def create_app(root="runs", token=None, bind_host="127.0.0.1"):
     from .web import install_routes
 
     install_routes(router, manager)
+    from .research import install_routes as install_research
+
+    install_research(router, manager)
     app.include_router(router)
 
     async def stream(websocket, experiment, since):

@@ -14,7 +14,12 @@ import {
 } from "recharts";
 import { api } from "./api";
 import type { Experiment, Metric } from "./types";
-const colors = ["#a9dc81", "#e7ad75", "#75b7bc", "#c49bdd"];
+const colors = [
+  "var(--plot-1)",
+  "var(--plot-2)",
+  "var(--plot-3)",
+  "var(--plot-4)",
+];
 export function MetricChart({
   rows,
   keys,
@@ -272,7 +277,7 @@ export function Analytics({
                   <XAxis dataKey="agent" />
                   <YAxis />
                   <Tooltip />
-                  <Bar dataKey="fitness" fill="#a9dc81" />
+                  <Bar dataKey="fitness" fill="var(--plot-1)" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

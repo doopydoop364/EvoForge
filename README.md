@@ -101,3 +101,7 @@ Open http://127.0.0.1:8765. For a fresh machine, follow the full
 [security](docs/web-security.md), [render scenes](docs/render-scene.md),
 [asset manifests](docs/asset-manifest.md), [Geometry Dash spectator](docs/geometrydash-spectator.md), [replay format](docs/replay-format.md), and
 [troubleshooting](docs/web-troubleshooting.md). No public tunnel or automatic deployment is required.
+
+## Research laboratory workspace
+
+The web interface includes experiment notebooks, tags and search, independent-seed batches, family trees, parameter/behavior comparisons, evolution history, tournaments, bookmarks, storage retention, portable experiment backups, resource monitoring and inference benchmarks. It retains the existing training engine and spectator. See [the research workspace guide](docs/research-workspace.md) for usage, provenance, limits and recovery behavior.

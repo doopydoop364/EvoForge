@@ -43,9 +43,16 @@ def atomic_json(path, data):
     atomic_bytes(path, json.dumps(data, indent=2, allow_nan=False).encode())
 
 
-def safe_load(path):
+def safe_load(path, max_bytes=None):
     """Never falls back to unrestricted pickle. v0.9 tensor/primitive dicts work."""
     try:
+        import re
+
+        version = re.match(r"(\d+)\.(\d+)", torch.__version__)
+        if not version or tuple(map(int, version.groups())) < (2, 10):
+            raise CheckpointError("Checkpoint loading requires PyTorch 2.10 or newer")
+        if max_bytes is not None and Path(path).stat().st_size > max_bytes:
+            raise CheckpointError("Checkpoint exceeds loading size limit")
         raw = Path(path).read_bytes()
         if raw.startswith(MAGIC):
             digest, payload = raw[len(MAGIC) :].split(b"\n", 1)
@@ -53,6 +60,12 @@ def safe_load(path):
                 raise CheckpointError("Checkpoint integrity checksum mismatch")
         else:
             payload = raw
+        import zipfile
+
+        if max_bytes is not None and zipfile.is_zipfile(io.BytesIO(payload)):
+            with zipfile.ZipFile(io.BytesIO(payload)) as archive:
+                if sum(info.file_size for info in archive.infolist()) > max_bytes:
+                    raise CheckpointError("Expanded tensor archive exceeds loading size limit")
         data = torch.load(io.BytesIO(payload), map_location="cpu", weights_only=True)
         if not isinstance(data, dict):
             raise CheckpointError("Checkpoint must contain a mapping")

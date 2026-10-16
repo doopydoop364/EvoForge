@@ -18,12 +18,22 @@ import {
   Sun,
   Terminal,
   Zap,
+  GitBranch,
+  Dna,
+  History,
+  Trophy,
+  Bookmark,
+  HardDrive,
+  Archive,
+  Gauge,
 } from "lucide-react";
 import { api, ApiError } from "./api";
 import { ExperimentForm } from "./ExperimentForm";
-import { Analytics, MetricChart } from "./Analytics";
+import { MetricChart } from "./Analytics";
 import { Spectator } from "./Spectator";
 import { SceneView } from "./SceneView";
+import { ResearchPage, Notebook, SeedBatch, researchPages } from "./Research";
+import { research, type Bookmark as ResearchBookmark } from "./researchApi";
 import { Timestamp } from "./Timestamp";
 import { WorkerLog } from "./WorkerLog";
 import type { Config, Experiment, Game } from "./types";
@@ -31,7 +41,16 @@ const pages = [
   ["Dashboard", LayoutDashboard],
   ["Experiments", FlaskConical],
   ["Spectator", MonitorPlay],
-  ["Analytics", BarChart3],
+  ["Family Trees", GitBranch],
+  ["Genetic Comparison", Dna],
+  ["Evolution Replay", History],
+  ["Compare Runs", BarChart3],
+  ["Tournament Lab", Trophy],
+  ["Research Bookmarks", Bookmark],
+  ["Storage Manager", HardDrive],
+  ["Backups", Archive],
+  ["System Resources", Activity],
+  ["Benchmarks", Gauge],
   ["Games & Plugins", Boxes],
   ["Workers", Cpu],
   ["Logs", Terminal],
@@ -87,11 +106,16 @@ export default function App() {
     [token, setToken] = useState(""),
     [theme, setTheme] = useState(() => {
       try {
-        return localStorage.getItem("evoforge-theme") || "dark";
+        return localStorage.getItem("evoforge-theme") || "light";
       } catch {
-        return "dark";
+        return "light";
       }
     });
+  const [librarySearch, setLibrarySearch] = useState("");
+  const [libraryState, setLibraryState] = useState("all");
+  const [researchFocus, setResearchFocus] = useState<ResearchBookmark | null>(
+    null,
+  );
   const [dialog, setDialog] = useState<{
       action: string;
       run: Experiment;
@@ -157,7 +181,29 @@ export default function App() {
     enabled,
     refetchInterval: 3000,
   });
+  const catalog = useQuery({
+    queryKey: ["research", "catalog"],
+    queryFn: research.catalog,
+    enabled: enabled && page === "Experiments",
+    refetchInterval: 10000,
+  });
   const all = runs.data || [];
+  const library = all.filter((run) => {
+    const metadata = catalog.data?.find((row) => row.id === run.id);
+    const matches =
+      `${run.id} ${run.config.game} ${run.config.mode} ${run.status} ${metadata?.tags.join(" ") || ""} ${metadata?.notes_preview || ""}`
+        .toLowerCase()
+        .includes(librarySearch.toLowerCase());
+    return (
+      matches &&
+      (libraryState === "all" ||
+        (libraryState === "archived"
+          ? !!run.archived
+          : libraryState === "active"
+            ? active.includes(run.status)
+            : run.status === "COMPLETED"))
+    );
+  });
   const current =
     all.find((r) => r.id === selected) ||
     all.find((r) => !r.archived && active.includes(r.status)) ||
@@ -306,6 +352,7 @@ export default function App() {
   }
   function navigate(next: string) {
     setPage(next);
+    setResearchFocus(null);
     setSidebar(false);
     setCreating(false);
   }
@@ -324,7 +371,7 @@ export default function App() {
             <Zap size={22} />
           </span>
           <span>
-            EvoForge<small>EVOLUTION WORKSPACE</small>
+            EvoForge<small>RESEARCH LABORATORY</small>
           </span>
         </a>
         <span className="nav-label">WORKSPACE</span>
@@ -355,7 +402,7 @@ export default function App() {
                 ? "Sign-in required"
                 : "Backend unavailable"}
           </div>
-          <small>WEB 0.1 · LOCAL CONTROL</small>
+          <small>EVOLUTION · RESEARCH · OBSERVATION</small>
         </div>
       </aside>
       <div className="main-shell">
@@ -706,6 +753,35 @@ export default function App() {
                         <RefreshCw size={16} />
                       </button>
                     </div>
+                    <div className="research-controls">
+                      <label>
+                        Search experiments
+                        <input
+                          type="search"
+                          value={librarySearch}
+                          onChange={(e) => setLibrarySearch(e.target.value)}
+                          placeholder="Name, environment, tags, or notes"
+                        />
+                      </label>
+                      <label>
+                        Show
+                        <select
+                          value={libraryState}
+                          onChange={(e) => setLibraryState(e.target.value)}
+                        >
+                          <option value="all">All experiments</option>
+                          <option value="active">Active workers</option>
+                          <option value="completed">Completed runs</option>
+                          <option value="archived">Archived runs</option>
+                        </select>
+                      </label>
+                    </div>
+                    {catalog.error && (
+                      <p className="muted">
+                        Tags and notes search are unavailable:{" "}
+                        {catalog.error.message}
+                      </p>
+                    )}
                     <div className="table-wrap">
                       <table>
                         <thead>
@@ -719,13 +795,22 @@ export default function App() {
                           </tr>
                         </thead>
                         <tbody>
-                          {all.map((r) => (
+                          {library.map((r) => (
                             <tr
                               key={r.id}
                               className={id === r.id ? "current-row" : ""}
                             >
                               <td>
                                 <b>{r.id}</b>
+                                <div className="run-tags">
+                                  {catalog.data
+                                    ?.find((row) => row.id === r.id)
+                                    ?.tags.map((tag) => (
+                                      <span className="badge" key={tag}>
+                                        {tag}
+                                      </span>
+                                    ))}
+                                </div>
                               </td>
                               <td>{r.config.game}</td>
                               <td>{r.config.mode}</td>
@@ -733,8 +818,14 @@ export default function App() {
                                 <Status run={r} />
                               </td>
                               <td>
-                                {r.worker?.generation ?? 0} /{" "}
-                                {r.config.generations}
+                                {r.worker?.generation ??
+                                  (dashboard.data?.latest[r.id]
+                                    ? Number(
+                                        dashboard.data.latest[r.id]
+                                          ?.generation ?? -1,
+                                      ) + 1
+                                    : 0)}{" "}
+                                / {r.config.generations}
                               </td>
                               <td>
                                 <button
@@ -749,6 +840,11 @@ export default function App() {
                         </tbody>
                       </table>
                     </div>
+                    {!!all.length && !library.length && (
+                      <p className="empty">
+                        No experiments match these filters.
+                      </p>
+                    )}
                     {!all.length && (
                       <p className="empty">
                         No experiments yet. Create one to get started.
@@ -775,7 +871,7 @@ export default function App() {
                         <button onClick={() => navigate("Spectator")}>
                           Watch gameplay
                         </button>
-                        <button onClick={() => navigate("Analytics")}>
+                        <button onClick={() => navigate("Compare Runs")}>
                           Review analytics
                         </button>
                         {(["csv", "json"] as const).map((format) => (
@@ -821,7 +917,27 @@ export default function App() {
                 </>
               )}
               {page === "Spectator" && <Spectator key={id} run={current} />}
-              {page === "Analytics" && <Analytics runs={all} selected={id} />}
+              {researchPages.includes(page) && (
+                <ResearchPage
+                  key={`${page}:${id}:${researchFocus?.id || ""}`}
+                  page={page}
+                  runs={all}
+                  id={id}
+                  initialGeneration={researchFocus?.generation ?? undefined}
+                  initialAgent={researchFocus?.agent ?? undefined}
+                  initialRight={researchFocus?.right_agent ?? undefined}
+                  onOpen={(bookmark) => {
+                    setResearchFocus(bookmark);
+                    setPage(bookmark.view);
+                  }}
+                />
+              )}
+              {page === "Experiments" && !creating && current && (
+                <>
+                  <Notebook key={id} id={id} />
+                  <SeedBatch key={`batch-${id}`} run={current} />
+                </>
+              )}
               {page === "Games & Plugins" && (
                 <>
                   <div className="panel">
@@ -901,8 +1017,10 @@ export default function App() {
                     </select>
                   </label>
                   <p className="muted">
-                    Only your theme preference is saved in browser storage. The
-                    renderer respects your system’s reduced-motion preference.
+                    Your theme preference is saved in browser storage. Research
+                    notes, bookmarks, and retention settings are saved with the
+                    workspace. The renderer respects your system’s
+                    reduced-motion preference.
                   </p>
                   <h3>Connection</h3>
                   <p>Same-origin API · {location.origin}/api/v1</p>
