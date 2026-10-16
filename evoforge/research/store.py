@@ -19,6 +19,21 @@ SCHEMA = 2
 DEFAULT_WEIGHT_BYTES = 64 * 1024 * 1024
 
 
+SCHEMA_SQL = """
+                CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS nodes (
+                    id TEXT PRIMARY KEY, generation INTEGER NOT NULL, slot INTEGER NOT NULL,
+                    operation TEXT NOT NULL, parents TEXT NOT NULL, fingerprint TEXT,
+                    descriptor TEXT, weights BLOB, fitness REAL);
+                CREATE INDEX IF NOT EXISTS node_generation ON nodes(generation, slot);
+                CREATE TABLE IF NOT EXISTS history (generation INTEGER PRIMARY KEY, data TEXT NOT NULL);
+                CREATE TABLE IF NOT EXISTS bookmarks (
+                    id TEXT PRIMARY KEY, title TEXT NOT NULL, view TEXT NOT NULL,
+                    generation INTEGER, agent TEXT, notes TEXT NOT NULL, created REAL NOT NULL, right_agent TEXT);
+
+            """
+
+
 def encoded(value):
     return json.dumps(value, sort_keys=True, separators=(",", ":"), allow_nan=False)
 
@@ -47,19 +62,7 @@ class ResearchStore:
             version = db.execute("PRAGMA user_version").fetchone()[0]
             if version > SCHEMA:
                 raise ValueError("Unsupported research database version")
-            db.executescript("""
-                CREATE TABLE IF NOT EXISTS metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS nodes (
-                    id TEXT PRIMARY KEY, generation INTEGER NOT NULL, slot INTEGER NOT NULL,
-                    operation TEXT NOT NULL, parents TEXT NOT NULL, fingerprint TEXT,
-                    descriptor TEXT, weights BLOB, fitness REAL);
-                CREATE INDEX IF NOT EXISTS node_generation ON nodes(generation, slot);
-                CREATE TABLE IF NOT EXISTS history (generation INTEGER PRIMARY KEY, data TEXT NOT NULL);
-                CREATE TABLE IF NOT EXISTS bookmarks (
-                    id TEXT PRIMARY KEY, title TEXT NOT NULL, view TEXT NOT NULL,
-                    generation INTEGER, agent TEXT, notes TEXT NOT NULL, created REAL NOT NULL, right_agent TEXT);
-
-            """)
+            db.executescript(SCHEMA_SQL)
             db.execute("BEGIN IMMEDIATE")
             columns = {r[1] for r in db.execute("PRAGMA table_info(bookmarks)")}
             if "right_agent" not in columns:

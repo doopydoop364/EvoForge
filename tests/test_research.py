@@ -443,3 +443,16 @@ def test_backup_checks_research_architecture_without_allocating(tmp_path):
         )
     with pytest.raises(ValueError, match="policy dimensions"):
         validate_artifacts(manager.path("alpha"))
+
+
+def test_backup_rejects_database_expressions_before_integrity_check(tmp_path):
+    from evoforge.research.archive import validate_artifacts
+
+    manager = trained(tmp_path, generations=1)
+    store = ResearchStore(manager.path("alpha"))
+    with store.connect() as db:
+        db.executescript(
+            "DROP TABLE metadata; CREATE TABLE metadata (key TEXT PRIMARY KEY, value TEXT NOT NULL CHECK(length(randomblob(1000000))>0));"
+        )
+    with pytest.raises(ValueError, match="database definitions"):
+        validate_artifacts(manager.path("alpha"))

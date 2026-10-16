@@ -272,6 +272,22 @@ def validate_artifacts(directory):
     if research.exists():
         with sqlite3.connect(f"file:{research}?mode=ro&immutable=1", uri=True) as db:
             db.execute("PRAGMA trusted_schema=OFF")
+            # Inspect definitions as data before any integrity check can evaluate
+            # CHECK/generated expressions supplied by an imported database.
+            from .store import SCHEMA_SQL
+
+            def normalized(sql):
+                return re.sub(r"\s+", "", sql.replace("IF NOT EXISTS", "")).lower()
+
+            definitions = {normalized(sql) for sql in SCHEMA_SQL.split(";") if sql.strip()}
+            legacy = SCHEMA_SQL.replace(", right_agent TEXT", "")
+            definitions.update(normalized(sql) for sql in legacy.split(";") if sql.strip())
+            for kind, name, sql in db.execute("SELECT type,name,sql FROM sqlite_master"):
+                automatic_index = (
+                    kind == "index" and name.startswith("sqlite_autoindex_") and sql is None
+                )
+                if not automatic_index and (not sql or normalized(sql) not in definitions):
+                    raise ValueError("Unsupported research database definitions")
             if db.execute("PRAGMA quick_check").fetchone()[0] != "ok":
                 raise ValueError("Research database integrity check failed")
             expected = {"metadata", "nodes", "history", "bookmarks"}
